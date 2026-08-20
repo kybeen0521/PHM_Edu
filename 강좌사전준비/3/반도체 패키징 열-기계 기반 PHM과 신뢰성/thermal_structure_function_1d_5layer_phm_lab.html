@@ -1,0 +1,2604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>반도체 패키지 과도 열응답 기반 구조함수 분석 실습 (1D 5층 · PHM)</title>
+<style>
+:root{
+  --ink:#10222E; --ink-2:#3B5261; --line:#C9D5DE; --line-2:#E3EAEF;
+  --bg:#EDF1F4; --panel:#FFFFFF; --band:#152836;
+  --cyan:#1C7C99; --normal:#12556E; --degraded:#C0392B; --target:#B36B00;
+  --ok:#1E7A46; --warn:#A8590A; --exact:#5A6B78;
+  --mono:ui-monospace,SFMono-Regular,"D2Coding",Consolas,"Courier New",monospace;
+  --sans:"Pretendard","Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-0.01em}
+a{color:var(--cyan)}
+code,.mono,td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ── 헤더 ─────────────────────────────────────────────── */
+header.top{background:var(--band);color:#E8F1F5;border-bottom:3px solid var(--cyan)}
+.top-inner{max-width:1680px;margin:0 auto;padding:18px 22px 16px}
+.eyebrow{font-size:11.5px;letter-spacing:.22em;color:#7FB8CC;font-weight:600;text-transform:uppercase}
+header.top h1{font-size:24px;margin:6px 0 4px;color:#FFF}
+header.top p.sub{margin:0;color:#A9C3CF;font-size:13px}
+.goals{max-width:1680px;margin:0 auto;padding:0 22px 18px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.goal{background:rgba(255,255,255,.06);border-left:3px solid var(--cyan);padding:7px 10px;font-size:12.5px;color:#DCE9EF}
+.goal b{color:#7FD3EE;font-family:var(--mono);margin-right:6px}
+.pipeline{max-width:1680px;margin:0 auto;padding:0 22px 16px;font-family:var(--mono);font-size:11.5px;color:#8FB3C2;word-break:keep-all}
+.pipeline span{color:#E8F1F5}
+
+/* ── 레이아웃 ─────────────────────────────────────────── */
+.wrap{max-width:1680px;margin:0 auto;padding:16px 22px 60px;display:grid;grid-template-columns:296px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1080px){.wrap{grid-template-columns:minmax(0,1fr)}.goals{grid-template-columns:1fr}}
+@media (max-width:640px){.wrap{padding:12px 10px 48px}.btnrow{grid-template-columns:1fr}}
+aside.panel{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line)}
+@media (max-width:1080px){aside.panel{position:static;max-height:none}}
+.panel h2{font-size:13px;padding:10px 12px;background:#F3F7F9;border-bottom:1px solid var(--line);letter-spacing:.02em}
+.pgroup{padding:10px 12px;border-bottom:1px solid var(--line-2)}
+.pgroup>h3{font-size:11.5px;letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase;margin-bottom:8px}
+.ctl{margin-bottom:9px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;gap:6px}
+.ctl label .val{font-family:var(--mono);font-size:12px;color:var(--cyan);font-weight:600}
+.ctl input[type=range]{width:100%;margin:3px 0 0;accent-color:var(--cyan)}
+.ctl input[type=number],.ctl select{width:100%;padding:4px 6px;border:1px solid var(--line);font-family:var(--mono);font-size:12.5px;background:#FCFDFE;color:var(--ink)}
+.ctl .hint{font-size:11px;color:var(--ink-2)}
+.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:6px;cursor:pointer}
+.chk input{accent-color:var(--cyan);width:15px;height:15px}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+button{font-family:var(--sans);font-size:12.5px;padding:7px 8px;border:1px solid var(--line);background:#FFF;color:var(--ink);cursor:pointer;transition:background .12s}
+button:hover{background:#F0F6F9}
+button:focus-visible,input:focus-visible,select:focus-visible,.tab:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+button.primary{background:var(--band);color:#fff;border-color:var(--band);font-weight:600}
+button.primary:hover{background:#20404F}
+button.wide{grid-column:1/-1}
+.file{display:block;font-size:11.5px;margin:4px 0 8px}
+.file input{font-size:11px;width:100%}
+.status{font-size:11.5px;font-family:var(--mono);color:var(--ink-2);padding:8px 12px;background:#F7FAFB}
+.err{color:var(--degraded);font-size:11.5px;padding:0 12px 8px;white-space:pre-wrap}
+
+/* ── 탭 ───────────────────────────────────────────────── */
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:2px solid var(--band);margin-bottom:14px}
+.tab{border:1px solid var(--line);border-bottom:none;background:#DFE7EC;padding:9px 14px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.tab[aria-selected=true]{background:var(--band);color:#fff;border-color:var(--band)}
+section.tabpage{display:none}
+section.tabpage.active{display:block}
+
+/* ── 카드 / 그리드 ────────────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--line);margin-bottom:14px}
+.card>header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);background:#F3F7F9}
+.card>header h3{font-size:13.5px}
+.card>header .tag{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.card .body{padding:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:1180px){.grid2{grid-template-columns:1fr}}
+.caption{font-size:12.5px;color:var(--ink-2);padding:8px 12px;border-top:1px dashed var(--line);background:#FAFCFD;word-break:keep-all}
+.note{font-size:12.5px;background:#F4F8FA;border-left:3px solid var(--cyan);padding:9px 11px;margin:10px 0;word-break:keep-all}
+.note b{color:var(--band)}
+.formula{font-family:var(--mono);font-size:12.5px;background:#F7FAFB;border:1px solid var(--line-2);padding:7px 9px;margin:6px 0;overflow-x:auto;white-space:nowrap}
+.warnbox{background:#FDF3E7;border-left:3px solid var(--warn);color:#7A4405;padding:9px 11px;font-size:12.5px;margin:10px 0}
+.warnbox:empty{display:none}
+
+/* ── 그래프 ───────────────────────────────────────────── */
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;height:auto}
+.tip{position:absolute;pointer-events:none;background:rgba(21,40,54,.95);color:#EAF3F7;font-family:var(--mono);font-size:11px;padding:5px 7px;border-radius:2px;white-space:pre;opacity:0;transition:opacity .08s;z-index:5;line-height:1.45}
+.pngbtn{font-size:11px;padding:3px 8px}
+
+/* ── 표 ───────────────────────────────────────────────── */
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{border:1px solid var(--line-2);padding:5px 8px;text-align:left}
+th{background:#F3F7F9;font-weight:600;font-size:12px}
+td.num,th.num{text-align:right;font-family:var(--mono)}
+tr.hl td{background:#FFF6E8}
+.tblwrap{overflow-x:auto}
+.pill{display:inline-block;padding:1px 7px;font-size:11px;font-weight:700;border-radius:2px}
+.pill.pass{background:#E3F3E9;color:var(--ok)}
+.pill.check{background:#FBEAE7;color:var(--degraded)}
+.legend-inline{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink-2);padding:4px 0 8px}
+.legend-inline i{display:inline-block;width:22px;height:0;border-top-width:2.5px;border-top-style:solid;vertical-align:middle;margin-right:5px}
+
+/* ── PHM 진단 ─────────────────────────────────────────── */
+.diag{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:900px){.diag{grid-template-columns:1fr}}
+.dbox{border:1px solid var(--line);background:#FBFDFE}
+.dbox h4{font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;background:var(--band);color:#DCEAF0}
+.dbox .dbody{padding:10px}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px dotted var(--line-2)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--ink-2)}
+.kv .v{font-family:var(--mono);font-weight:600}
+.big{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--degraded);display:block;margin:2px 0 6px}
+.interpret{background:#F7FAFB;border:1px solid var(--line);padding:12px;margin-top:12px}
+.interpret li{margin:4px 0;word-break:keep-all}
+footer.foot{max-width:1680px;margin:0 auto;padding:10px 22px 40px;font-size:11.5px;color:var(--ink-2)}
+@media print{aside.panel,.tabs{display:none}section.tabpage{display:block!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="eyebrow">한국PHM학회 강습회 · 실습 프로그램</div>
+    <h1>반도체 패키지 과도 열응답 기반 구조함수 분석 실습</h1>
+    <p class="sub">1D 5층 모델 · Network Identification by Deconvolution · Foster–Cauer 변환 · 구조함수 기반 고장 위치 추정</p>
+  </div>
+  <div class="goals">
+    <div class="goal"><b>1</b>과도 온도 응답을 열임피던스로 변환한다.</div>
+    <div class="goal"><b>2</b>로그 시간 미분과 시간상수 스펙트럼의 의미를 이해한다.</div>
+    <div class="goal"><b>3</b>Foster 네트워크와 Cauer 네트워크의 차이를 이해한다.</div>
+    <div class="goal"><b>4</b>누적 및 미분 구조함수에서 패키지의 층별 열경로를 구분한다.</div>
+    <div class="goal"><b>5</b>정상/열화 구조함수의 분기를 이용해 고장 위치를 추정한다.</div>
+    <div class="goal"><b>6</b>Heat source로부터 2번째 층의 열화가 구조함수에 어떻게 반영되는지 이해한다.</div>
+  </div>
+  <div class="pipeline">분석 절차 &nbsp;│&nbsp; <span>Tj(t)</span> → <span>Zth(t)</span> → <span>dZth/dln t</span> → <span>시간상수 스펙트럼</span> → <span>Foster RC</span> → <span>Cauer RC</span> → <span>누적 구조함수</span> → <span>미분 구조함수</span> → <span>정상/열화 비교</span> → <span>감지 · 위치추정 · 심각도</span></div>
+</header>
+
+<div class="wrap">
+<!-- ══════════ 제어 패널 ══════════ -->
+<aside class="panel">
+  <h2>제어 패널</h2>
+
+  <div class="pgroup">
+    <h3>실행</h3>
+    <div class="ctl"><label>예제 시나리오</label><select id="preset"></select>
+      <div class="hint" id="presetDesc"></div></div>
+    <div class="btnrow">
+      <button class="primary wide" id="btnRun">분석 실행</button>
+      <button id="btnDefault">기본 예제 실행</button>
+      <button id="btnReset">설정 초기화</button>
+      <button class="wide" id="btnRenoise">잡음 다시 생성</button>
+    </div>
+  </div>
+
+  <div class="pgroup">
+    <h3>시험 조건</h3>
+    <div class="ctl"><label>입력전력 P [W]</label><input type="number" id="P_W" value="10" min="0.1" max="500" step="0.1"></div>
+    <div class="ctl"><label>초기·주변온도 T0 [°C]</label><input type="number" id="T0_C" value="25" min="-50" max="200" step="0.5"></div>
+    <div class="ctl"><label>최소 측정시간 [s]</label><input type="number" id="tMin_s" value="1e-7" step="any"></div>
+    <div class="ctl"><label>최대 측정시간 [s]</label><input type="number" id="tMax_s" value="10" step="any"></div>
+    <div class="ctl"><label>측정점 수 <span class="val" id="v_nPoints">300</span></label><input type="range" id="nPoints" min="100" max="600" step="10" value="300"></div>
+    <div class="ctl"><label>온도 잡음 σ [°C]</label><input type="number" id="noise_C" value="0.002" min="0" max="0.2" step="0.001"></div>
+    <label class="chk"><input type="checkbox" id="indepNoise"> 정상·열화를 각각 독립 측정 <span class="hint">(잡음 실현을 다르게)</span></label>
+  </div>
+
+  <div class="pgroup">
+    <h3>패키지 · 열화 모델</h3>
+    <div class="ctl"><label>층별 분할 셀 수 <span class="val" id="v_nCell">10</span></label><input type="range" id="nCell" min="5" max="20" step="1" value="10"><div class="hint">전체 Cauer 단수 = 5 × 셀 수</div></div>
+    <div class="ctl"><label>열화 대상 층</label>
+      <select id="degradeIndex">
+        <option value="0">Layer 1 · Si die</option>
+        <option value="1" selected>Layer 2 · Die attach (기본)</option>
+        <option value="2">Layer 3 · Cu spreader</option>
+        <option value="3">Layer 4 · TIM</option>
+        <option value="4">Layer 5 · Al heat sink base</option>
+      </select></div>
+    <div class="ctl"><label>열화 배율 (k 감소) <span class="val" id="v_degradeFactor">2.5</span></label><input type="range" id="degradeFactor" min="1" max="4" step="0.05" value="2.5"><div class="hint">1.0 = 정상, 값이 클수록 해당 층 열저항 증가</div></div>
+  </div>
+
+  <div class="pgroup">
+    <h3>신호 처리 · 역해석</h3>
+    <div class="ctl"><label>로그 미분 평활 창 <span class="val" id="v_smoothWindow">11</span></label><input type="range" id="smoothWindow" min="5" max="31" step="2" value="11"></div>
+    <div class="ctl"><label>시간상수 grid 개수 <span class="val" id="v_nTau">120</span></label><input type="range" id="nTau" min="60" max="200" step="10" value="120"></div>
+    <div class="ctl"><label>정규화 강도 λ <span class="val" id="v_lambda">1.0e-3</span></label><input type="range" id="lambdaExp" min="-6" max="-1" step="0.1" value="-3"></div>
+    <div class="ctl"><label>Foster 차수 <span class="val" id="v_fosterOrder">8</span></label><input type="range" id="fosterOrder" min="4" max="12" step="1" value="8"></div>
+  </div>
+
+  <div class="pgroup">
+    <h3>구조함수 · 진단</h3>
+    <div class="ctl"><label>분기 임계값 (절대) <span class="val" id="v_divThreshold">0.010</span></label><input type="range" id="divThreshold_KW" min="0.001" max="0.1" step="0.001" value="0.01"><div class="hint">ΔRΣ [K/W] 절대 기준</div></div>
+    <div class="ctl"><label>분기 임계값 (상대) <span class="val" id="v_divRelative">40</span></label><input type="range" id="divRelative_pct" min="5" max="80" step="5" value="40"><div class="hint">총 ΔRth 대비 [%] · 둘 중 큰 값 적용</div></div>
+    <div class="ctl"><label>연속 초과 점수 <span class="val" id="v_divConsecutive">3</span></label><input type="range" id="divConsecutive" min="1" max="10" step="1" value="3"></div>
+    <label class="chk"><input type="checkbox" id="showExact"> 정답 구조함수 보기 <span class="hint">(학생 모드 해제)</span></label>
+    <label class="chk"><input type="checkbox" id="showRaw"> 평활 전 로그미분 함께 보기</label>
+    <label class="chk"><input type="checkbox" id="sfLogY" checked> 구조함수 CΣ 로그축</label>
+  </div>
+
+  <div class="pgroup">
+    <h3>측정 데이터 업로드 (CSV)</h3>
+    <label class="file">정상 데이터<input type="file" id="fileNormal" accept=".csv,.txt"></label>
+    <label class="file">열화 데이터<input type="file" id="fileDegraded" accept=".csv,.txt"></label>
+    <div class="btnrow"><button class="wide" id="btnClearUpload">업로드 해제 (내부 예제 사용)</button></div>
+    <div class="hint" style="margin-top:6px">형식: <code>time_s,temperature_C</code> 또는 <code>time_s,delta_temperature_C</code></div>
+    <div class="err" id="uploadErr"></div>
+  </div>
+
+  <div class="pgroup">
+    <h3>내보내기</h3>
+    <div class="btnrow">
+      <button id="btnCsvN">정상 CSV</button>
+      <button id="btnCsvD">열화 CSV</button>
+      <button class="wide" id="btnCsvA">분석 결과 CSV</button>
+      <button class="wide" id="btnPng">현재 탭 그래프 PNG 저장</button>
+    </div>
+  </div>
+  <div class="status" id="status">준비 중…</div>
+</aside>
+
+<!-- ══════════ 본문 ══════════ -->
+<main>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="1" aria-selected="true">Tab 1. 5층 1D 패키지 모델 및 과도 응답</button>
+    <button class="tab" role="tab" data-tab="2" aria-selected="false">Tab 2. 로그 미분 및 시간상수 스펙트럼</button>
+    <button class="tab" role="tab" data-tab="3" aria-selected="false">Tab 3. Foster–Cauer 변환</button>
+    <button class="tab" role="tab" data-tab="4" aria-selected="false">Tab 4. 구조함수 및 PHM 진단</button>
+  </div>
+
+  <!-- ─────────── TAB 1 ─────────── -->
+  <section class="tabpage active" id="page1">
+    <div class="grid2">
+      <div class="card">
+        <header><h3>그림 1. 5층 패키지 개념도</h3><span class="tag">1D 수직 열경로</span></header>
+        <div class="body"><div id="fig1"></div></div>
+        <div class="caption">열원에서 주변까지 열이 지나가는 순서대로 5개 층을 배치한 1D 모델이다. 각 층의 두께·열전도율·체적열용량으로부터 R = L/(kA), C = c<sub>v</sub>AL 를 계산한다. Layer 2(Die attach)가 본 실습의 열화 대상층이다.</div>
+      </div>
+      <div class="card">
+        <header><h3>그림 2. 1D Cauer 셀 분할 개념도</h3><span class="tag" id="fig2tag">총 50단</span></header>
+        <div class="body"><div id="fig2"></div></div>
+        <div class="caption">각 물리층을 동일한 크기의 셀로 공간 분할하면 1D 열확산이 재현되어, 정답 누적 구조함수에서 층마다 하나의 선형 구간이 나타나고 층 경계에서 기울기가 바뀐다. 셀 하나의 값은 R<sub>cell</sub> = R<sub>layer</sub>/N, C<sub>cell</sub> = C<sub>layer</sub>/N 이다.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h3>층별 물성 및 계산된 열저항·열용량</h3><span class="tag">A = 10 mm × 10 mm = 1.0×10⁻⁴ m²</span></header>
+      <div class="body"><div class="tblwrap"><table id="tblLayers"></table></div>
+        <div class="note"><b>열화 모델.</b> 열용량과 형상은 그대로 두고 대상 층의 유효 열전도율만 <code>k → k / 열화배율</code>로 낮춘다. 따라서 해당 층의 R만 배율만큼 증가하고 C는 변하지 않는다.</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><header><h3>그래프 1. 과도 온도 응답 T<sub>j</sub>(t)</h3><button class="pngbtn" data-png="c1">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c1"></div></div>
+        <div class="caption">t = 0 에서 전력 P를 인가한 step heating 응답이다. 로그 시간축에서 각 층의 열용량이 순차적으로 채워지며 계단 형태가 나타난다.</div></div>
+      <div class="card"><header><h3>그래프 2. 열임피던스 Z<sub>th</sub>(t)</h3><button class="pngbtn" data-png="c2">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c2"></div>
+          <div class="formula">Zth(t) = [ Tj(t) − T0 ] / P&nbsp;&nbsp;[K/W],&nbsp;&nbsp;Zth(∞) → Σ Ri</div></div>
+        <div class="caption">온도 응답을 전력으로 정규화한 값이다. 정상상태 값이 곧 총 열저항이 된다.</div></div>
+      <div class="card"><header><h3>그래프 3. 열임피던스 차이 ΔZ<sub>th</sub>(t)</h3><button class="pngbtn" data-png="c3">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c3"></div></div>
+        <div class="caption">열화 곡선에서 정상 곡선을 뺀 값이다. 차이가 커지기 시작하는 시각이 열화가 위치한 층의 열확산 시간과 관련된다.</div></div>
+      <div class="card"><header><h3>수치 요약</h3></header>
+        <div class="body"><div class="tblwrap"><table id="tblSummary1"></table></div>
+          <div class="warnbox" id="warnSnr"></div></div>
+        <div class="caption">Zth(t) = [Tj(t) − T0] / P 로 정규화하므로 구조함수는 입력전력 P 와 주변온도 T0 에 무관하다. 다만 온도 잡음 σ 는 절대값이라 P 가 작으면 SNR 이 나빠져 역추정 정확도만 떨어진다. Zth(∞)와 이론 ΣR의 차이는 유한한 측정시간과 수치적분 오차에서 비롯된다.</div></div>
+    </div>
+  </section>
+
+  <!-- ─────────── TAB 2 ─────────── -->
+  <section class="tabpage" id="page2">
+    <div class="card"><div class="body">
+      <div class="note"><b>왜 로그 시간 미분인가.</b> 열확산은 시간상수가 수십~수억 배 차이 나는 다중 스케일 현상이므로 z = ln(t) 축에서 다룬다. 로그 시간 미분 <code>h(z) = dZth/d ln t</code> 는 시간상수 스펙트럼과 커널 <code>w(z) = exp(z − e<sup>z</sup>)</code> 의 합성곱이 되어, 디컨볼루션으로 스펙트럼을 복원할 수 있다.</div>
+      <div class="formula">Zth(t) = Σ Ri [1 − exp(−t/τi)]&nbsp;&nbsp;⇒&nbsp;&nbsp;dZth/d ln t = Σ Ri (t/τi) exp(−t/τi)</div>
+      <div class="formula">minimize over r ≥ 0 :&nbsp; ‖ K r − h ‖² + λ² ‖ L r ‖²&nbsp;&nbsp;(L = 2차 차분 행렬, FISTA 비음수 투영)</div>
+    </div></div>
+    <div class="grid2">
+      <div class="card"><header><h3>그래프 4. 로그 시간 미분 dZ<sub>th</sub>/d ln(t)</h3><button class="pngbtn" data-png="c4">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c4"></div></div>
+        <div class="caption">국소 다항식(Savitzky–Golay 등가) 평활 후 중앙차분으로 계산한다. 평활 창을 키우면 잡음은 줄지만 인접한 시간상수 피크가 뭉개진다.</div></div>
+      <div class="card"><header><h3>그래프 5. 시간상수 스펙트럼 (시함수)</h3><button class="pngbtn" data-png="c5">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c5"></div></div>
+        <div class="caption">각 막대는 해당 로그 시간상수 구간이 담당하는 Foster 열저항 성분 R<sub>i</sub> [K/W]이다. λ가 작으면 뾰족하지만 잡음에 취약하고, 크면 매끄럽지만 피크가 병합된다.</div></div>
+      <div class="card"><header><h3>디컨볼루션 적합도</h3><button class="pngbtn" data-png="c5b">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c5b"></div></div>
+        <div class="caption">복원된 스펙트럼을 커널과 다시 합성한 결과와 측정 로그미분의 비교이다. 회색 영역은 신호가 잡음 수준보다 작아 시간상수 추정에서 제외한 구간이다.</div></div>
+      <div class="card"><header><h3>스펙트럼 요약</h3></header>
+        <div class="body"><div class="tblwrap"><table id="tblSpec"></table></div></div>
+        <div class="caption">측정 시간창(t<sub>min</sub>~t<sub>max</sub>) 밖의 시간상수는 원리적으로 식별되지 않으므로 해석에서 제외해야 한다.</div></div>
+    </div>
+  </section>
+
+  <!-- ─────────── TAB 3 ─────────── -->
+  <section class="tabpage" id="page3">
+    <div class="card">
+      <header><h3>그림 3. Foster와 Cauer 차이 개념도</h3><span class="tag">동일 임피던스, 다른 구조</span></header>
+      <div class="body"><div id="fig3"></div></div>
+      <div class="caption">두 회로는 열원에서 본 임피던스가 완전히 같지만 내부 구조가 다르다. Foster의 각 RC 성분은 실제 패키지 층과 일대일로 대응하지 않으며, Cauer 사다리만이 열원에서 주변으로 이어지는 순차적 열경로를 나타낸다.</div>
+    </div>
+    <div class="card"><div class="body">
+      <div class="formula">ZF(s) = Σ RF,i / (1 + s τF,i) = N(s)/D(s)&nbsp;&nbsp;→&nbsp;&nbsp;연분수 전개&nbsp;&nbsp;Y = D/N = sC₁ + 1/(R₁ + 1/(sC₂ + …))</div>
+      <div class="warnbox" id="cauerWarn"></div>
+    </div></div>
+    <div class="grid2">
+      <div class="card"><header><h3>그래프 6. Z<sub>th</sub>와 Foster 재구성 Z<sub>F</sub></h3><button class="pngbtn" data-png="c6">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c6"></div></div>
+        <div class="caption">축약된 Foster 모델이 원래 열임피던스를 얼마나 재현하는지 확인한다. 차수가 너무 낮으면 재현이 나빠지고, 너무 높으면 Foster–Cauer 변환이 수치적으로 불안정해진다.</div></div>
+      <div class="card"><header><h3>그래프 7. Foster 모델 재구성 잔차</h3><button class="pngbtn" data-png="c7">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c7"></div></div>
+        <div class="caption">잔차가 특정 시간대에 몰려 있으면 그 시간상수 영역의 표현이 부족하다는 뜻이다.</div></div>
+    </div>
+    <div class="card"><header><h3>Foster 파라미터 (정상 / 열화)</h3><span class="tag" id="fosterErrTag"></span></header>
+      <div class="body"><div class="tblwrap"><table id="tblFoster"></table></div></div></div>
+    <div class="card"><header><h3>Cauer 파라미터 (연분수 전개 결과)</h3><span class="tag" id="cauerEqTag"></span></header>
+      <div class="body"><div class="tblwrap"><table id="tblCauer"></table></div>
+        <div class="note"><b>해석 주의.</b> Cauer 단수의 R, C는 물리 층과 정확히 일치하는 것이 아니라 열원에서 본 <i>유효 열경로</i>의 순차적 분해이다. 누적값을 이어 그린 것이 곧 역추정 구조함수이다.</div></div></div>
+  </section>
+
+  <!-- ─────────── TAB 4 ─────────── -->
+  <section class="tabpage" id="page4">
+    <div class="grid2">
+      <div class="card"><header><h3>그림 4 · 그래프 8. 누적 구조함수 C<sub>Σ</sub>(R<sub>Σ</sub>)</h3><button class="pngbtn" data-png="c8">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c8"></div></div>
+        <div class="caption">배경 밴드는 정답 모델의 5개 층 구간이다. 곡선이 완만하면(기울기 큼) 열저항은 작고 열용량이 큰 재료, 가파르면 열저항이 큰 계면층이다. 정답 곡선은 실선, 역추정 곡선은 점선·기호로 구분된다.</div></div>
+      <div class="card"><header><h3>그림 5. 정상 vs 열화 비교 설명도</h3><span class="tag">개념도</span></header>
+        <div class="body"><div id="fig5"></div></div>
+        <div class="caption">열화가 발생한 층에서는 열용량이 거의 그대로인 채 열저항만 늘어나므로, 그 구간에서 곡선이 오른쪽으로 늘어나고 이후 층 전체가 통째로 오른쪽으로 평행 이동한다.</div></div>
+      <div class="card"><header><h3>그림 6 · 그래프 9. 미분 구조함수 K(R<sub>Σ</sub>) = dC<sub>Σ</sub>/dR<sub>Σ</sub></h3><button class="pngbtn" data-png="c9">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c9"></div></div>
+        <div class="caption">각 층은 K ≈ C<sub>i</sub>/R<sub>i</sub> 높이의 plateau로 나타난다. 열화된 층은 plateau 높이가 낮아지고 폭(열저항 구간)이 넓어진다.</div></div>
+      <div class="card"><header><h3>그래프 10. 구조함수 수평 이동 ΔR<sub>Σ</sub>(C<sub>Σ</sub>)</h3><button class="pngbtn" data-png="c10">PNG</button></header>
+        <div class="body"><div class="chartbox" id="c10"></div></div>
+        <div class="caption">동일 누적 열용량 위치에서 두 구조함수의 열저항 차이다. 이 값이 임계값을 연속으로 넘는 최초 위치를 분기점으로 정의한다.</div></div>
+    </div>
+
+    <div class="card">
+      <header><h3>PHM 진단 결과</h3><span class="tag">Detection · Localization · Severity</span></header>
+      <div class="body">
+        <div class="diag">
+          <div class="dbox"><h4>Detection · 이상 감지</h4><div class="dbody" id="dDet"></div></div>
+          <div class="dbox"><h4>Localization · 위치 추정</h4><div class="dbody" id="dLoc"></div></div>
+          <div class="dbox"><h4>Severity · 심각도</h4><div class="dbody" id="dSev"></div></div>
+        </div>
+        <div class="interpret" id="interpret"></div>
+      </div>
+    </div>
+
+    <div class="card"><header><h3>교육용 해석 지침</h3></header><div class="body">
+      <ol style="margin:0;padding-left:20px">
+        <li>Foster 네트워크의 각 RC 성분은 실제 패키지 층과 일대일로 대응하지 않는다.</li>
+        <li>Cauer 네트워크는 열원에서 주변으로 이어지는 순차적인 유효 열경로를 나타낸다.</li>
+        <li>구조함수에서 관찰되는 분기점은 반드시 기준 시편과 비교하여 해석해야 한다.</li>
+        <li>실제 패키지는 3차원 열확산과 병렬 열경로를 가지므로 1D 예제처럼 층 경계가 항상 완벽히 분리되지는 않는다.</li>
+        <li>미분 구조함수는 평활화와 정규화 조건에 민감하다.</li>
+        <li>본 예제는 알고리즘과 PHM 진단 원리를 이해하기 위한 교육용 1D 5층 모델이다.</li>
+        <li>본 실습의 핵심 고장 시나리오는 “heat source로부터 2번째 층(Die attach)의 열화”이다.</li>
+      </ol>
+    </div></div>
+  </section>
+
+  <!-- 검증 -->
+  <div class="card">
+    <header><h3>수치 검증 및 품질 기준</h3><span class="tag" id="validTag"></span></header>
+    <div class="body"><div class="tblwrap"><table id="tblValid"></table></div></div>
+  </div>
+</main>
+</div>
+<footer class="foot">thermal_structure_function_1d_5layer_phm_lab.html · 단일 HTML 파일 · 외부 서버/라이브러리/인터넷 연결 불필요 · 모든 수치는 브라우저에서 실시간 계산됩니다.</footer>
+
+<script>
+/* =============================================================================
+ *  thermal_structure_function_1d_5layer_phm_lab  :  수치해석 엔진 (core)
+ *  단위 규약 : [m], [W/(m*K)], [J/(m^3*K)], [K/W], [J/K], [s], [W], [degC]
+ *  이 파일에는 DOM 접근 코드가 전혀 없다. (Node 환경에서 단독 검증 가능)
+ * ========================================================================== */
+(function (root) {
+  'use strict';
+
+  /* ---------------------------------------------------------------------------
+   * 0. 기본 물리 상수 및 기본 층 정보
+   * ------------------------------------------------------------------------ */
+
+  // 공통 단면적 A = 10 mm x 10 mm = 1.0e-4 [m^2]
+  var AREA_M2 = 1.0e-4;
+
+  // 기본 5층 구성 (Heat source -> Layer1 ... Layer5 -> Ambient)
+  var DEFAULT_LAYERS = [
+    { name: 'Si die',            L_m: 0.20e-3, k_WmK: 130.0, cv_Jm3K: 1.63e6, color: '#1f6f8b' },
+    { name: 'Die attach',        L_m: 0.05e-3, k_WmK: 3.0,   cv_Jm3K: 1.20e6, color: '#c8342b' },
+    { name: 'Cu spreader',       L_m: 1.00e-3, k_WmK: 390.0, cv_Jm3K: 3.45e6, color: '#b8860b' },
+    { name: 'TIM',               L_m: 0.10e-3, k_WmK: 4.0,   cv_Jm3K: 1.60e6, color: '#2e7d4f' },
+    { name: 'Al heat sink base', L_m: 3.00e-3, k_WmK: 200.0, cv_Jm3K: 2.43e6, color: '#5b4b9b' }
+  ];
+
+  /**
+   * 강습회용 예제 시나리오.
+   *  set 에 들어간 항목만 제어 패널 값을 덮어쓴다.
+   *  모든 시나리오는 사양 기본 물성(DEFAULT_LAYERS)을 그대로 쓰므로 검증표가 항상 유효하다.
+   */
+  var PRESETS = [
+    {
+      id: 'demo', name: '① 시연 · 가장 뚜렷한 열화',
+      desc: 'Die attach 4배 열화, 잡음 없음. 구조함수 분기와 평행 이동이 가장 선명하게 보인다. 첫 시연에 사용한다.',
+      set: { degradeIndex: 1, degradeFactor: 4.0, noise_C: 0, nPoints: 400, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'std', name: '② 표준 예제 (기본값)',
+      desc: 'Die attach 2.5배 열화, 잡음 0.002 °C. 사양서 기준 조건이며 총 열저항이 0.608 → 0.858 K/W 로 증가한다.',
+      set: { degradeIndex: 1, degradeFactor: 2.5, noise_C: 0.002, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'real', name: '③ 실측 수준 잡음',
+      desc: 'Die attach 1.5배 열화, 잡음 0.01 °C. 실제 계측기에 가까운 조건에서도 위치 추정이 되는지 확인한다.',
+      set: { degradeIndex: 1, degradeFactor: 1.5, noise_C: 0.01, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'lim', name: '④ 검출 한계 근처',
+      desc: 'Die attach 1.05배 열화, 잡음 0.01 °C. 총 열저항 증가(0.008 K/W)는 감지되지만 구조함수 분기는 잡음에 묻혀 위치를 판정하지 못한다. 감지와 위치추정의 한계가 다르다는 것을 보여준다.',
+      set: { degradeIndex: 1, degradeFactor: 1.05, noise_C: 0.01, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'tim', name: '⑤ TIM 열화 (다른 층)',
+      desc: 'TIM 2.5배 열화. 분기점이 heat source에서 더 먼 4번째 층으로 이동하는 것을 확인한다.',
+      set: { degradeIndex: 3, degradeFactor: 2.5, noise_C: 0.002, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'die', name: '⑥ Si die 열화 · 난이도 상',
+      desc: 'Si die 3배 열화. 원래 열저항이 작은 층이라 총 열저항 증가가 0.031 K/W 에 그치고, 역추정 구조함수로는 분기를 잡지 못해 정답 곡선을 보조로 쓴다. 판정이 왜 어려운지 토의한다.',
+      set: { degradeIndex: 0, degradeFactor: 3.0, noise_C: 0.002, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: false }
+    },
+    {
+      id: 'ref', name: '⑦ 정상 대조군 (열화 없음)',
+      desc: '열화 배율 1.0 + 독립 측정. 물성이 같은 두 시편을 따로 측정했을 때 남는 어긋남이 곧 분해능 한계이다. 진단은 "이상 없음"이어야 한다.',
+      set: { degradeIndex: 1, degradeFactor: 1.0, noise_C: 0.002, nPoints: 300, fosterOrder: 8, lambdaExp: -3, smoothWindow: 11, nTau: 120, indepNoise: true }
+    }
+  ];
+
+  /* ---------------------------------------------------------------------------
+   * 1. 난수 (seed 고정) : mulberry32 + Box-Muller
+   * ------------------------------------------------------------------------ */
+
+  /** seed 고정 균등난수 생성기 반환 */
+  function makeRng(seed) {
+    var a = (seed >>> 0) || 1;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** 표준정규 난수(Box-Muller) */
+  function gaussian(rng) {
+    var u1 = Math.max(rng(), 1e-12), u2 = rng();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 2. 층 모델 / Cauer 셀 분할
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * createLayerModel : 물리층 목록으로부터 R[K/W], C[J/K] 계산
+   *  Ri = Li / (ki * A),  Ci = cvi * A * Li
+   * @param {object} opt {layers, area_m2, degradeIndex(0-base), degradeFactor}
+   */
+  function createLayerModel(opt) {
+    opt = opt || {};
+    var base = opt.layers || DEFAULT_LAYERS;
+    var A = (opt.area_m2 > 0) ? opt.area_m2 : AREA_M2;
+    var di = (opt.degradeIndex === undefined) ? 1 : opt.degradeIndex; // 기본 Layer 2
+    var df = (opt.degradeFactor === undefined) ? 1.0 : opt.degradeFactor;
+
+    return base.map(function (L, i) {
+      // 열화 모델 : 형상/체적열용량은 유지하고 유효 열전도율만 감소
+      var kEff = (i === di) ? (L.k_WmK / df) : L.k_WmK;
+      var R = L.L_m / (kEff * A);      // [K/W]
+      var C = L.cv_Jm3K * A * L.L_m;   // [J/K]
+      return {
+        index: i, name: L.name, color: L.color,
+        L_m: L.L_m, k_WmK: kEff, k0_WmK: L.k_WmK, cv_Jm3K: L.cv_Jm3K,
+        R_KW: R, C_JK: C, tau_s: R * C
+      };
+    });
+  }
+
+  /**
+   * buildCauerCells : 각 물리층을 nCell개의 동일 1D Cauer 셀로 분할
+   *  Rcell = Rlayer/N, Ccell = Clayer/N
+   */
+  function buildCauerCells(layers, nCell) {
+    var n = Math.max(1, Math.round(nCell || 10));
+    var cells = [];
+    for (var i = 0; i < layers.length; i++) {
+      for (var j = 0; j < n; j++) {
+        cells.push({
+          R_KW: layers[i].R_KW / n,
+          C_JK: layers[i].C_JK / n,
+          layer: i
+        });
+      }
+    }
+    return cells;
+  }
+
+  /** 층 경계의 누적 열저항/열용량 [K/W],[J/K] */
+  function layerBoundaries(layers) {
+    var rc = 0, cc = 0, out = [];
+    for (var i = 0; i < layers.length; i++) {
+      rc += layers[i].R_KW; cc += layers[i].C_JK;
+      out.push({ index: i, name: layers[i].name, Rcum_KW: rc, Ccum_JK: cc,
+                 Rstart_KW: rc - layers[i].R_KW, Cstart_JK: cc - layers[i].C_JK });
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 3. 열회로 행렬 및 과도해석 (Crank-Nicolson + Thomas algorithm)
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * buildThermalMatrices : 1D 직렬 열경로의 삼중대각 컨덕턴스 행렬 G [W/K]
+   *  노드 i 는 열용량 Ci, 노드 i~i+1 사이 열저항 Ri. 마지막 노드는 R_n 을 통해 T0 에 연결.
+   *  상태변수 : theta = T - T0  (주변온도 기준 온도상승) => 경계항이 소거됨
+   */
+  function buildThermalMatrices(cells) {
+    var n = cells.length;
+    var diag = new Float64Array(n), sup = new Float64Array(n), sub = new Float64Array(n);
+    var cap = new Float64Array(n), b = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      var g = 1 / cells[i].R_KW;            // 노드 i -> i+1 (또는 ambient) 컨덕턴스
+      diag[i] += g;
+      if (i < n - 1) { sup[i] = -g; sub[i + 1] = -g; diag[i + 1] += g; }
+      cap[i] = cells[i].C_JK;
+    }
+    b[0] = 1.0;                              // 첫 노드에 전력 P 인가
+    return { n: n, diag: diag, sup: sup, sub: sub, cap: cap, b: b };
+  }
+
+  /**
+   * solveTridiagonal : Thomas algorithm (삼중대각 선형계 해법)
+   *  a: 하부대각(a[0] 미사용), d: 주대각, c: 상부대각(c[n-1] 미사용), r: 우변
+   */
+  function solveTridiagonal(a, d, c, r) {
+    var n = d.length;
+    var cp = new Float64Array(n), rp = new Float64Array(n), x = new Float64Array(n);
+    var beta = d[0];
+    if (Math.abs(beta) < 1e-300) beta = 1e-300;
+    cp[0] = c[0] / beta; rp[0] = r[0] / beta;
+    for (var i = 1; i < n; i++) {
+      beta = d[i] - a[i] * cp[i - 1];
+      if (Math.abs(beta) < 1e-300) beta = 1e-300;
+      cp[i] = (i < n - 1 ? c[i] : 0) / beta;
+      rp[i] = (r[i] - a[i] * rp[i - 1]) / beta;
+    }
+    x[n - 1] = rp[n - 1];
+    for (var j = n - 2; j >= 0; j--) x[j] = rp[j] - cp[j] * x[j + 1];
+    return x;
+  }
+
+  /**
+   * simulateTransient : step 가열(t=0 에서 P 인가)에 대한 과도 응답
+   *  C dT/dt + G T = b P  를 Crank-Nicolson 으로 적분
+   * @return {Float64Array} 각 출력시각의 열원노드 온도상승 dTj [K]
+   */
+  function simulateTransient(cells, times_s, P_W, subSteps) {
+    var M = buildThermalMatrices(cells);
+    var n = M.n, ns = Math.max(1, subSteps || 4);
+    var theta = new Float64Array(n);              // 온도상승 [K]
+    var out = new Float64Array(times_s.length);
+    var ad = new Float64Array(n), dd = new Float64Array(n), cd = new Float64Array(n), rhs = new Float64Array(n);
+    var tPrev = 0.0, i, k, s;
+
+    for (k = 0; k < times_s.length; k++) {
+      var tNow = times_s[k];
+      // 최초 구간(0 -> t_min)은 강한 stiff 구간이므로 세분화를 늘린다
+      var nsub = (k === 0) ? Math.max(ns, 40) : ns;
+      var dt = (tNow - tPrev) / nsub;
+      if (!(dt > 0)) { out[k] = theta[0]; continue; }
+      for (s = 0; s < nsub; s++) {
+        // A = C/dt + G/2 , rhs = (C/dt - G/2)*theta + b*P
+        for (i = 0; i < n; i++) {
+          dd[i] = M.cap[i] / dt + 0.5 * M.diag[i];
+          ad[i] = 0.5 * M.sub[i];
+          cd[i] = 0.5 * M.sup[i];
+        }
+        for (i = 0; i < n; i++) {
+          var v = (M.cap[i] / dt - 0.5 * M.diag[i]) * theta[i];
+          if (i > 0) v -= 0.5 * M.sub[i] * theta[i - 1];
+          if (i < n - 1) v -= 0.5 * M.sup[i] * theta[i + 1];
+          rhs[i] = v + M.b[i] * P_W;
+        }
+        theta = solveTridiagonal(ad, dd, cd, rhs);
+      }
+      tPrev = tNow;
+      out[k] = theta[0];
+    }
+    return out;
+  }
+
+  /** addMeasurementNoise : 온도 잡음 부가 [degC], seed 고정 */
+  function addMeasurementNoise(T, sigma_C, seed) {
+    var rng = makeRng(seed), out = new Float64Array(T.length);
+    for (var i = 0; i < T.length; i++) out[i] = T[i] + (sigma_C > 0 ? sigma_C * gaussian(rng) : 0);
+    return out;
+  }
+
+  /** calculateThermalImpedance : Zth = (Tj - T0)/P [K/W] */
+  function calculateThermalImpedance(Tj_C, T0_C, P_W) {
+    var z = new Float64Array(Tj_C.length);
+    for (var i = 0; i < Tj_C.length; i++) z[i] = (Tj_C[i] - T0_C) / P_W;
+    return z;
+  }
+
+  /** 로그 간격 시간축 생성 [s] */
+  function makeLogTime(tMin_s, tMax_s, nPoints) {
+    var t = new Float64Array(nPoints);
+    var a = Math.log(tMin_s), b = Math.log(tMax_s);
+    for (var i = 0; i < nPoints; i++) t[i] = Math.exp(a + (b - a) * i / (nPoints - 1));
+    return t;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 4. 로그 시간 미분
+   * ------------------------------------------------------------------------ */
+
+  /** resampleLogTime : z=ln(t) 축에서 균일 간격 재샘플 (선형보간) */
+  function resampleLogTime(t_s, y, nz) {
+    var z0 = Math.log(t_s[0]), z1 = Math.log(t_s[t_s.length - 1]);
+    var z = new Float64Array(nz), v = new Float64Array(nz), j = 0;
+    var zsrc = new Float64Array(t_s.length);
+    for (var i = 0; i < t_s.length; i++) zsrc[i] = Math.log(t_s[i]);
+    for (i = 0; i < nz; i++) {
+      var zz = z0 + (z1 - z0) * i / (nz - 1);
+      while (j < zsrc.length - 2 && zsrc[j + 1] < zz) j++;
+      var f = (zz - zsrc[j]) / Math.max(zsrc[j + 1] - zsrc[j], 1e-300);
+      z[i] = zz; v[i] = y[j] + f * (y[j + 1] - y[j]);
+    }
+    return { z: z, y: v };
+  }
+
+  /**
+   * smoothLogResponse : 국소 다항식(Savitzky-Golay 등가) 평활
+   *  경계에서는 창을 잘라 국소 최소자승 적합을 다시 수행한다.
+   */
+  function smoothLogResponse(y, window, order) {
+    var n = y.length, w = Math.max(3, Math.round(window || 11) | 1), p = Math.max(1, order || 2);
+    var half = (w - 1) >> 1, out = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      var i0 = Math.max(0, i - half), i1 = Math.min(n - 1, i + half);
+      var m = p + 1;
+      var ATA = [], ATb = new Float64Array(m), r, c, j;
+      for (r = 0; r < m; r++) { ATA.push(new Float64Array(m)); }
+      for (j = i0; j <= i1; j++) {
+        var x = j - i, pw = new Float64Array(m), q;
+        pw[0] = 1; for (q = 1; q < m; q++) pw[q] = pw[q - 1] * x;
+        for (r = 0; r < m; r++) { for (c = 0; c < m; c++) ATA[r][c] += pw[r] * pw[c]; ATb[r] += pw[r] * y[j]; }
+      }
+      var sol = solveDense(ATA, ATb);
+      out[i] = sol ? sol[0] : y[i];  // x=0 (해당 점)의 적합값
+    }
+    return out;
+  }
+
+  /** 소형 조밀행렬 가우스 소거 (부분 피벗) */
+  function solveDense(A, b) {
+    var n = b.length, i, j, k;
+    var M = [];
+    for (i = 0; i < n; i++) { M.push(new Float64Array(n + 1)); for (j = 0; j < n; j++) M[i][j] = A[i][j]; M[i][n] = b[i]; }
+    for (i = 0; i < n; i++) {
+      var piv = i;
+      for (k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+      if (Math.abs(M[piv][i]) < 1e-14) return null;
+      var tmp = M[i]; M[i] = M[piv]; M[piv] = tmp;
+      for (k = i + 1; k < n; k++) {
+        var f = M[k][i] / M[i][i];
+        for (j = i; j <= n; j++) M[k][j] -= f * M[i][j];
+      }
+    }
+    var x = new Float64Array(n);
+    for (i = n - 1; i >= 0; i--) {
+      var s = M[i][n];
+      for (j = i + 1; j < n; j++) s -= M[i][j] * x[j];
+      x[i] = s / M[i][i];
+    }
+    return x;
+  }
+
+  /** calculateLogDerivative : 균일 z 격자에서 중앙차분 dZ/dln(t) */
+  function calculateLogDerivative(z, y) {
+    var n = y.length, d = new Float64Array(n), h = z[1] - z[0];
+    for (var i = 1; i < n - 1; i++) d[i] = (y[i + 1] - y[i - 1]) / (2 * h);
+    d[0] = (y[1] - y[0]) / h;
+    d[n - 1] = (y[n - 1] - y[n - 2]) / h;
+    return d;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 5. 시간상수 스펙트럼 (비음수 Tikhonov 정규화 디컨볼루션)
+   * ------------------------------------------------------------------------ */
+
+  /** 로그 간격 시간상수 후보 [s] */
+  function makeTauGrid(tMin_s, tMax_s, nTau) {
+    // 관측 가능한 시간상수 범위로 제한한다.
+    //  측정이 tMax 안에서 정상상태에 도달하므로 tau > tMax 성분은 데이터로 결정할 수 없고,
+    //  이런 열(column)이 남아 있으면 잡음이 그쪽으로 새어 Cauer 사다리를 발산시킨다.
+    var a = Math.log(tMin_s * 0.5), b = Math.log(tMax_s);
+    var tau = new Float64Array(nTau);
+    for (var i = 0; i < nTau; i++) tau[i] = Math.exp(a + (b - a) * i / (nTau - 1));
+    return tau;
+  }
+
+  /**
+   * buildDeconvKernel : h(z) = sum_j r_j * w(z - ln tau_j),  w(x)=exp(x - e^x)
+   *  K[i][j] = exp(u - exp(u)),  u = z_i - ln(tau_j)
+   */
+  function buildDeconvKernel(z, tau) {
+    var m = z.length, q = tau.length, K = [];
+    for (var i = 0; i < m; i++) {
+      var row = new Float64Array(q);
+      for (var j = 0; j < q; j++) {
+        var u = z[i] - Math.log(tau[j]);
+        row[j] = (u > 30) ? 0 : Math.exp(u - Math.exp(u));
+      }
+      K.push(row);
+    }
+    return K;
+  }
+
+  /**
+   * solveNonnegativeTikhonov : min_{r>=0} ||K r - h||^2 + lambda^2 ||L r||^2
+   *  FISTA(가속 투영 경사법)로 직접 구현 (외부 최적화 라이브러리 없음)
+   */
+  function solveNonnegativeTikhonov(K, h, lambda, iters) {
+    var m = K.length, q = K[0].length, i, j, k;
+    // A = K^T K + lambda^2 L^T L , b = K^T h
+    var A = [];
+    for (i = 0; i < q; i++) A.push(new Float64Array(q));
+    for (k = 0; k < m; k++) {
+      var row = K[k];
+      for (i = 0; i < q; i++) {
+        var ri = row[i];
+        if (ri === 0) continue;
+        var Ai = A[i];
+        for (j = i; j < q; j++) Ai[j] += ri * row[j];
+      }
+    }
+    for (i = 0; i < q; i++) for (j = 0; j < i; j++) A[i][j] = A[j][i];
+    var b = new Float64Array(q);
+    for (i = 0; i < q; i++) { var s = 0; for (k = 0; k < m; k++) s += K[k][i] * h[k]; b[i] = s; }
+    // L : 2차 차분 행렬 -> L^T L 을 A 에 누적
+    var lam2 = lambda * lambda;
+    for (k = 0; k < q - 2; k++) {
+      var idx = [k, k + 1, k + 2], val = [1, -2, 1];
+      for (i = 0; i < 3; i++) for (j = 0; j < 3; j++) A[idx[i]][idx[j]] += lam2 * val[i] * val[j];
+    }
+    // 관측 시간창 밖(측정으로 식별 불가능)의 시간상수 성분에 대한 미세 감쇠
+    //  -> 커널 열노름이 매우 작은 열은 잔차에 거의 기여하지 않아 임의의 값이 들어갈 수 있으므로
+    //     ridge 항을 추가하여 비관측 성분이 총 열저항을 오염시키는 것을 방지한다.
+    var colN = new Float64Array(q), colMax = 0;
+    for (i = 0; i < q; i++) { colN[i] = A[i][i]; }  // 이 시점의 대각은 ||K_i||^2 + 정규화항
+    for (k = 0; k < m; k++) { }
+    for (i = 0; i < q; i++) { var cn = 0; for (k = 0; k < m; k++) cn += K[k][i] * K[k][i]; colN[i] = cn; if (cn > colMax) colMax = cn; }
+    var ridge = 1e-4 * colMax;
+    for (i = 0; i < q; i++) A[i][i] += ridge;
+    // Lipschitz 상수 : power iteration
+    var v = new Float64Array(q); for (i = 0; i < q; i++) v[i] = 1 / Math.sqrt(q);
+    var lipEig = 1;
+    for (k = 0; k < 60; k++) {
+      var w = matVec(A, v), nrm = norm2(w);
+      if (nrm < 1e-300) break;
+      for (i = 0; i < q; i++) v[i] = w[i] / nrm;
+      lipEig = nrm;
+    }
+    var step = 1 / (2 * Math.max(lipEig, 1e-300));
+
+    var x = new Float64Array(q), y = new Float64Array(q), xPrev = new Float64Array(q);
+    var t = 1, N = iters || 1500;
+    for (k = 0; k < N; k++) {
+      var Ay = matVec(A, y);
+      for (i = 0; i < q; i++) {
+        var g = 2 * (Ay[i] - b[i]);
+        var xi = y[i] - step * g;
+        x[i] = xi > 0 ? xi : 0;            // 비음수 투영
+      }
+      var tNext = 0.5 * (1 + Math.sqrt(1 + 4 * t * t));
+      var mom = (t - 1) / tNext;
+      for (i = 0; i < q; i++) { y[i] = x[i] + mom * (x[i] - xPrev[i]); xPrev[i] = x[i]; }
+      t = tNext;
+    }
+    return x;
+  }
+
+  function matVec(A, v) {
+    var n = A.length, out = new Float64Array(n);
+    for (var i = 0; i < n; i++) { var s = 0, Ai = A[i]; for (var j = 0; j < v.length; j++) s += Ai[j] * v[j]; out[i] = s; }
+    return out;
+  }
+  function norm2(v) { var s = 0; for (var i = 0; i < v.length; i++) s += v[i] * v[i]; return Math.sqrt(s); }
+
+  /**
+   * estimateTimeConstantSpectrum : 로그미분 h(z) -> 시간상수 스펙트럼 r(tau)
+   * @param {number} i0 잡음 하한(SNR) 때문에 사용하지 않는 앞쪽 구간의 끝 인덱스
+   */
+  function estimateTimeConstantSpectrum(z, h, tau, lambda, iters, i0) {
+    var K = buildDeconvKernel(z, tau);
+    var start = Math.max(0, Math.min(i0 || 0, Math.floor(z.length * 0.5)));
+    var Ksub = K.slice(start), hsub = Array.prototype.slice.call(h, start);
+    var r = solveNonnegativeTikhonov(Ksub, hsub, lambda, iters);
+    // 적합값 및 잔차
+    var fit = new Float64Array(z.length), res = 0;
+    for (var i = 0; i < z.length; i++) {
+      var s = 0; for (var j = 0; j < tau.length; j++) s += K[i][j] * r[j];
+      fit[i] = s; if (i >= start) res += (s - h[i]) * (s - h[i]);
+    }
+    return { r: r, fit: fit, rmse: Math.sqrt(res / Math.max(1, z.length - start)), fitStart: start };
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 6. 스펙트럼 -> 대표 Foster 성분 축약
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * clusterSpectrumToFoster : 인접 피크 영역 군집화로 order 개의 대표 Foster 성분 생성
+   *  RF = sum r_j ,  ln(tauF) = sum(r_j ln tau_j)/sum(r_j) ,  CF = tauF/RF
+   */
+  function clusterSpectrumToFoster(tau, r, order) {
+    var q = r.length, i;
+    var rmax = 0; for (i = 0; i < q; i++) rmax = Math.max(rmax, r[i]);
+    if (rmax <= 0) return [];
+
+    // 1) 유효 지지구간(support) 결정
+    //    누적 열저항의 0.3% ~ 99.7% 구간만 사용한다. 양 끝의 잡음 꼬리를 잘라낸다.
+    var total = 0; for (i = 0; i < q; i++) total += r[i];
+    if (total <= 0) return [];
+    var acc = 0, i0 = 0, i1 = q - 1;
+    for (i = 0; i < q; i++) { acc += r[i]; if (acc >= 0.003 * total) { i0 = i; break; } }
+    acc = 0;
+    for (i = q - 1; i >= 0; i--) { acc += r[i]; if (acc >= 0.003 * total) { i1 = i; break; } }
+    if (i1 <= i0) { i0 = 0; i1 = q - 1; }
+
+    // 2) ln(tau) 축을 order 등분하여 군집한다.
+    //    봉우리 개수를 세는 방식은 잡음으로 봉우리가 하나 늘거나 줄면 군집 구조가
+    //    통째로 바뀌어, 같은 물성인데도 측정마다 Cauer 사다리가 크게 달라진다.
+    //    시간축 등분할은 데이터에 대해 연속적으로 변하므로 재현성이 훨씬 좋다.
+    var lo = Math.log(tau[i0]), hi = Math.log(tau[i1]);
+    var seg = [], prev = i0;
+    for (var b = 1; b <= order; b++) {
+      var edge = lo + (hi - lo) * b / order;
+      var cut = (b === order) ? (i1 + 1) : prev;
+      if (b < order) { cut = prev; while (cut <= i1 && Math.log(tau[cut]) < edge) cut++; }
+      if (cut > prev) { seg.push([prev, cut]); prev = cut; }
+    }
+    if (prev <= i1) seg.push([prev, i1 + 1]);
+
+    // 4) 대표값 계산
+    var out = [];
+    for (i = 0; i < seg.length; i++) {
+      var R = 0, lnw = 0;
+      for (var m = seg[i][0]; m < seg[i][1]; m++) { R += r[m]; lnw += r[m] * Math.log(tau[m]); }
+      if (R <= 1e-12) continue;
+      var tauF = Math.exp(lnw / R);
+      out.push({ R_KW: R, tau_s: tauF, C_JK: tauF / R });
+    }
+    out.sort(function (a, b) { return a.tau_s - b.tau_s; });
+    return out;
+  }
+
+  /** 중앙값 */
+  function median(v) {
+    var a = Array.prototype.slice.call(v).sort(function (x, y) { return x - y; });
+    var n = a.length; if (!n) return 0;
+    return (n % 2) ? a[(n - 1) >> 1] : 0.5 * (a[n / 2 - 1] + a[n / 2]);
+  }
+
+  function argMax(v) { var bi = 0; for (var i = 1; i < v.length; i++) if (v[i] > v[bi]) bi = i; return bi; }
+
+  /** reconstructFosterResponse : ZF(t) = sum RF_i [1 - exp(-t/tauF_i)] */
+  function reconstructFosterResponse(t_s, foster) {
+    var out = new Float64Array(t_s.length);
+    for (var i = 0; i < t_s.length; i++) {
+      var s = 0;
+      for (var j = 0; j < foster.length; j++) s += foster[j].R_KW * (1 - Math.exp(-t_s[i] / foster[j].tau_s));
+      out[i] = s;
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 7. 다항식 연산 (오름차순 계수 배열 : p[0] + p[1] s + p[2] s^2 + ...)
+   * ------------------------------------------------------------------------ */
+
+  function polyAdd(a, b) { var n = Math.max(a.length, b.length), o = new Float64Array(n); for (var i = 0; i < n; i++) o[i] = (a[i] || 0) + (b[i] || 0); return o; }
+  function polySub(a, b) { var n = Math.max(a.length, b.length), o = new Float64Array(n); for (var i = 0; i < n; i++) o[i] = (a[i] || 0) - (b[i] || 0); return o; }
+  function polyScale(a, c) { var o = new Float64Array(a.length); for (var i = 0; i < a.length; i++) o[i] = a[i] * c; return o; }
+  function polyMul(a, b) {
+    var o = new Float64Array(a.length + b.length - 1);
+    for (var i = 0; i < a.length; i++) { if (a[i] === 0) continue; for (var j = 0; j < b.length; j++) o[i + j] += a[i] * b[j]; }
+    return o;
+  }
+  function polyMulS(a) { var o = new Float64Array(a.length + 1); for (var i = 0; i < a.length; i++) o[i + 1] = a[i]; return o; } // s 를 곱함
+  function polyLead(a) { return a.length ? a[a.length - 1] : 0; }                                   // 최고차항 계수
+  function polyDropLead(a) { return a.slice(0, Math.max(a.length - 1, 0)); }                        // 최고차항 제거
+  function polyNormalize(a) { var l = polyLead(a); return (l !== 0) ? polyScale(a, 1 / l) : a.slice(0); }
+  function polyEvalComplex(a, re, im) {
+    var sr = 0, si = 0, pr = 1, pi = 0;
+    for (var i = 0; i < a.length; i++) {
+      sr += a[i] * pr; si += a[i] * pi;
+      var nr = pr * re - pi * im, ni = pr * im + pi * re;
+      pr = nr; pi = ni;
+    }
+    return [sr, si];
+  }
+
+  /**
+   * buildFosterPolynomial : ZF(s) = sum R_i/(1+s tau_i) = N(s)/D(s)
+   *  수치조건 개선을 위해 시간을 tauRef 로 정규화한 s' = s*tauRef 좌표에서 구성한다.
+   */
+  function buildFosterPolynomial(foster) {
+    var n = foster.length;
+    var lnsum = 0; for (var i = 0; i < n; i++) lnsum += Math.log(foster[i].tau_s);
+    var tauRef = Math.exp(lnsum / n);                        // 기하평균 [s]
+    var tp = foster.map(function (f) { return f.tau_s / tauRef; });
+
+    var D = new Float64Array([1]);
+    for (i = 0; i < n; i++) D = polyMul(D, new Float64Array([1, tp[i]]));
+    var N = new Float64Array(Math.max(n, 1));
+    for (i = 0; i < n; i++) {
+      var Pi = new Float64Array([foster[i].R_KW]);
+      for (var j = 0; j < n; j++) if (j !== i) Pi = polyMul(Pi, new Float64Array([1, tp[j]]));
+      N = polyAdd(N, Pi);
+    }
+    return { num: N, den: D, tauRef_s: tauRef };
+  }
+
+  /**
+   * convertFosterToCauer : 연분수 전개(continued fraction expansion)로 Cauer ladder 산출
+   *  Y = D/N = s*C1 + 1/(R1 + 1/(s*C2 + ...))
+   *  음수 성분이 유의하게 나오면 강제 보정하지 않고 불안정으로 표시한다.
+   */
+  function convertFosterToCauer(poly) {
+    var P = Array.prototype.slice.call(poly.den);   // deg n
+    var Q = Array.prototype.slice.call(poly.num);   // deg n-1
+    var tauRef = poly.tauRef_s;
+    var stages = [], mode = 'C', warn = null, negFlag = false;
+    var Rtot = 0, Ctot = 0, guard = 0;
+    var scaleRef = Math.max(Math.abs(polyLead(P)), 1e-300);
+    P = polyScale(new Float64Array(P), 1 / scaleRef);
+    Q = polyScale(new Float64Array(Q), 1 / scaleRef);
+    P = Array.prototype.slice.call(P); Q = Array.prototype.slice.call(Q);
+
+    var seqR = [], seqC = [];
+    while (guard++ < 400) {
+      if (Q.length === 0) break;
+      var lq = polyLead(Q), lp = polyLead(P);
+      if (!isFinite(lq) || !isFinite(lp) || Math.abs(lq) < 1e-300) break;
+      var val = lp / lq;
+      var newP;
+      if (mode === 'C') {
+        newP = polySub(new Float64Array(P), polyMulS(polyScale(new Float64Array(Q), val)));
+        seqC.push(val * tauRef);                        // C = C' * tauRef [J/K]
+      } else {
+        newP = polySub(new Float64Array(P), polyScale(new Float64Array(Q), val));
+        seqR.push(val);                                  // R [K/W] (정규화 무관)
+      }
+      // 최고차항은 이론적으로 상쇄되므로 명시적으로 제거
+      newP = Array.prototype.slice.call(newP, 0, Math.max(P.length - 1, 0));
+      P = Q; Q = newP;
+      // 사실상 0 인 꼬리 제거
+      while (Q.length > 0 && Math.abs(Q[Q.length - 1]) < 1e-14 * Math.max(1, maxAbs(P))) Q = Q.slice(0, Q.length - 1);
+      mode = (mode === 'C') ? 'R' : 'C';
+      if (seqC.length > 60) break;
+    }
+
+    var nStage = Math.min(seqR.length, seqC.length);
+    for (var i = 0; i < nStage; i++) {
+      var Rk = seqR[i], Ck = seqC[i];
+      if (!isFinite(Rk) || !isFinite(Ck)) { negFlag = true; break; }
+      if (Rk <= 0 || Ck <= 0) negFlag = true;
+      Rtot += Rk; Ctot += Ck;
+      stages.push({ stage: i + 1, R_KW: Rk, C_JK: Ck, Rcum_KW: Rtot, Ccum_JK: Ctot });
+    }
+    if (stages.length === 0) negFlag = true;
+    if (negFlag) {
+      warn = '현재 Foster 차수 또는 정규화 조건에서 Foster–Cauer 변환이 수치적으로 불안정합니다. Foster 차수를 낮추거나 정규화 강도를 높이십시오.';
+    }
+    return { stages: stages, ok: !negFlag, warning: warn };
+  }
+
+  function maxAbs(v) { var m = 0; for (var i = 0; i < v.length; i++) m = Math.max(m, Math.abs(v[i])); return m; }
+
+  /* ---------------------------------------------------------------------------
+   * 8. 구조함수
+   * ------------------------------------------------------------------------ */
+
+  /** calculateExactStructureFunction : 원래 1D Cauer 셀에서 직접 누적 */
+  function calculateExactStructureFunction(cells) {
+    var R = [0], C = [0], rc = 0, cc = 0;
+    for (var i = 0; i < cells.length; i++) {
+      rc += cells[i].R_KW; cc += cells[i].C_JK;
+      R.push(rc); C.push(cc);
+    }
+    return { R_KW: R, C_JK: C };
+  }
+
+  /** calculateEstimatedStructureFunction : 역추정 Cauer 단으로부터 누적 */
+  function calculateEstimatedStructureFunction(stages) {
+    var R = [0], C = [0], rc = 0, cc = 0;
+    for (var i = 0; i < stages.length; i++) {
+      rc += stages[i].R_KW; cc += stages[i].C_JK;
+      R.push(rc); C.push(cc);
+    }
+    return { R_KW: R, C_JK: C };
+  }
+
+  /**
+   * calculateDifferentialStructureFunction : K = dC/dR
+   *  각 단(셀)에 대해 K_i = C_i/R_i 인 구간별 계단형 함수로 반환
+   */
+  function calculateDifferentialStructureFunction(items) {
+    var xs = [], ys = [], rc = 0;
+    for (var i = 0; i < items.length; i++) {
+      var R = items[i].R_KW, C = items[i].C_JK, K = C / R;
+      xs.push(rc); ys.push(K);
+      rc += R;
+      xs.push(rc); ys.push(K);
+    }
+    return { R_KW: xs, K_JK2W: ys };
+  }
+
+  /** 누적 구조함수에서 임의 C 위치의 R 값을 선형보간 */
+  function interpRatC(sf, Cq) {
+    var C = sf.C_JK, R = sf.R_KW, n = C.length;
+    if (Cq <= C[0]) return R[0];
+    if (Cq >= C[n - 1]) return R[n - 1];
+    var lo = 0, hi = n - 1;
+    while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (C[mid] <= Cq) lo = mid; else hi = mid; }
+    var f = (Cq - C[lo]) / Math.max(C[hi] - C[lo], 1e-300);
+    return R[lo] + f * (R[hi] - R[lo]);
+  }
+
+  /**
+   * detectStructureFunctionDivergence : 동일 Ccum 에서 dR = R_deg - R_nom 계산 후 분기점 탐색
+   */
+  function detectStructureFunctionDivergence(sfNormal, sfDegraded, threshold_KW, consecutive, nGrid, relFrac) {
+    var Cmax = Math.min(sfNormal.C_JK[sfNormal.C_JK.length - 1], sfDegraded.C_JK[sfDegraded.C_JK.length - 1]);
+    var Cmin = Math.max(1e-6, Cmax * 1e-5);
+    var n = nGrid || 300, k = Math.max(1, consecutive || 3);
+    var Cg = [], dR = [], Rn = [], Rd = [];
+    for (var i = 0; i < n; i++) {
+      var c = Math.exp(Math.log(Cmin) + (Math.log(Cmax) - Math.log(Cmin)) * i / (n - 1));
+      var rn = interpRatC(sfNormal, c), rd = interpRatC(sfDegraded, c);
+      Cg.push(c); Rn.push(rn); Rd.push(rd); dR.push(rd - rn);
+    }
+    // 유효 임계값 : 절대 임계값과 (총 열저항 증가량 x 상대비율) 중 큰 값
+    //  -> 역추정 사다리는 단수가 적어 저용량 구간에서 계단형 오차가 크므로 상대 기준을 함께 사용한다
+    var dRtotal = sfDegraded.R_KW[sfDegraded.R_KW.length - 1] - sfNormal.R_KW[sfNormal.R_KW.length - 1];
+    var thrEff = Math.max(threshold_KW, (relFrac === undefined ? 0.40 : relFrac) * Math.max(dRtotal, 0));
+    // 지속 분리량(dRsettle) : 열용량 상위 구간에서 두 곡선이 벌어진 채로 유지되는 양.
+    //   실제 열화는 분기 이후 평행 이동으로 나타나므로 이 값이 임계값을 넘어야 한다.
+    //   계단 모서리의 위치가 조금 어긋나서 생기는 국소적인 뾰족한 차이는
+    //   금방 사라지므로 이 조건에서 걸러진다.
+    var tail = [];
+    for (i = Math.floor(n * 0.85); i < Math.floor(n * 0.97); i++) tail.push(dR[i]);
+    var dRsettle = median(tail);
+    var idx = -1;
+    if (dRsettle > thrEff) {
+      // 분기점 : 분리량이 지속 분리량의 절반에 도달해 k점 이상 유지되는 최초 위치
+      var cross = 0.5 * dRsettle;
+      for (i = 0; i + k <= n; i++) {
+        var ok = true;
+        for (var j = 0; j < k; j++) if (!(dR[i + j] > cross)) { ok = false; break; }
+        if (ok) { idx = i; break; }
+      }
+    }
+    var maxShift = 0; for (i = 0; i < n; i++) maxShift = Math.max(maxShift, dR[i]);
+    return {
+      C_JK: Cg, dR_KW: dR, Rnormal_KW: Rn, Rdegraded_KW: Rd,
+      index: idx, threshold_KW: thrEff, dRtotal_KW: dRtotal, dRsettle_KW: dRsettle,
+      found: idx >= 0,
+      C_at_KW: idx >= 0 ? Cg[idx] : null,
+      Rnormal_at_KW: idx >= 0 ? Rn[idx] : null,
+      maxShift_KW: maxShift
+    };
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 9. PHM 진단
+   * ------------------------------------------------------------------------ */
+
+  /** 누적 열저항 위치가 속한 물리층 판정 */
+  function locateLayerByR(bounds, R_KW) {
+    for (var i = 0; i < bounds.length; i++) if (R_KW <= bounds[i].Rcum_KW * 1.0000001) return i;
+    return bounds.length - 1;
+  }
+
+  /**
+   * performPHMDiagnosis : Detection / Localization / Severity
+   */
+  function performPHMDiagnosis(ctx) {
+    var Rn = ctx.RthNormal_KW, Rd = ctx.RthDegraded_KW;
+    var dR = Rd - Rn;
+    var dRpct = 100 * dR / Rn;
+    var div = ctx.divergence;
+    // 감지 하한 : 측정 잡음에서 오는 열저항 불확도(3σ/P)와 총 열저항의 0.5% 중 큰 값.
+    //   이보다 작은 차이는 열화로 보지 않는다(열화 배율 1.0이면 여기서 걸러진다).
+    var floorNoise = 3 * (ctx.noise_C || 0) / Math.max(ctx.P_W, 1e-9);
+    var detectFloor = Math.max(floorNoise, 0.005 * Rn);
+    var detected = (dR > detectFloor);
+    var layerIdx = null, layerName = null;
+    if (detected && div.found) {
+      layerIdx = locateLayerByR(ctx.bounds, div.Rnormal_at_KW);
+      layerName = ctx.bounds[layerIdx].name;
+    }
+    var dTinf = ctx.P_W * dR;
+    // 분기 이후 증가한 열저항을 해당 층의 열화 배율로 환산(추정)
+    var estFactor = null;
+    if (layerIdx !== null && ctx.layersNormal[layerIdx].R_KW > 0) {
+      estFactor = (ctx.layersNormal[layerIdx].R_KW + dR) / ctx.layersNormal[layerIdx].R_KW;
+    }
+    return {
+      dRth_KW: dR, dRth_pct: dRpct,
+      dTinf_C: dTinf,
+      detected: detected, detectFloor_KW: detectFloor,
+      branchFound: !!(detected && div.found),
+      layerIndex: layerIdx, layerName: layerName,
+      maxShift_KW: div.maxShift_KW,
+      estimatedFactor: estFactor
+    };
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 10. CSV
+   * ------------------------------------------------------------------------ */
+
+  /** parseCsvTimeTemp : time_s,temperature_C 또는 time_s,delta_temperature_C */
+  function parseCsvTimeTemp(text, T0_C) {
+    var lines = String(text).split(/\r?\n/).filter(function (l) { return l.trim().length > 0 && l.trim()[0] !== '#'; });
+    if (lines.length < 3) throw new Error('CSV 행 수가 너무 적습니다. 최소 3개 이상의 데이터 행이 필요합니다.');
+    var head = lines[0].toLowerCase().split(/[,\t;]/);
+    // 두 번째 열의 머리글만으로 온도 형식을 판정한다 (3번째 이후 열은 무시)
+    var isDelta = (head.length > 1) && (head[1].indexOf('delta') >= 0 || head[1].indexOf('rise') >= 0);
+    var start = /[a-z_]/i.test(lines[0]) ? 1 : 0;
+    var t = [], T = [];
+    for (var i = start; i < lines.length; i++) {
+      var p = lines[i].split(/[,\t;]/);
+      if (p.length < 2) throw new Error((i + 1) + '행: 열이 2개 미만입니다. "time_s,temperature_C" 형식을 확인하십시오.');
+      var a = parseFloat(p[0]), b = parseFloat(p[1]);
+      if (!isFinite(a) || !isFinite(b)) throw new Error((i + 1) + '행: 숫자로 변환할 수 없는 값이 있습니다.');
+      if (a <= 0) throw new Error((i + 1) + '행: 시간은 0보다 커야 합니다(로그 시간축 사용).');
+      if (t.length > 0 && a <= t[t.length - 1]) throw new Error((i + 1) + '행: 시간이 오름차순이 아닙니다.');
+      t.push(a); T.push(isDelta ? (T0_C + b) : b);
+    }
+    if (t.length < 20) throw new Error('데이터 점이 ' + t.length + '개로 너무 적습니다. 20개 이상을 권장합니다.');
+    return { t_s: t, T_C: T, isDelta: isDelta };
+  }
+
+  /** exportCSV : 배열들을 CSV 문자열로 */
+  function exportCSV(headers, columns) {
+    var n = columns[0].length, out = [headers.join(',')];
+    for (var i = 0; i < n; i++) {
+      var row = [];
+      for (var j = 0; j < columns.length; j++) {
+        var v = columns[j][i];
+        row.push(typeof v === 'number' ? formatNum(v) : String(v));
+      }
+      out.push(row.join(','));
+    }
+    return out.join('\n');
+  }
+  function formatNum(v) {
+    if (!isFinite(v)) return 'NaN';
+    if (v === 0) return '0';
+    return (Math.abs(v) < 1e-3 || Math.abs(v) >= 1e5) ? v.toExponential(6) : v.toPrecision(8).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 11. 전체 파이프라인
+   * ------------------------------------------------------------------------ */
+
+  /** 단일 케이스(정상 또는 열화) 분석 */
+  function analyzeCase(params, layers, cells, measured) {
+    var t_s, Tj_C, isUploaded = !!measured;
+    if (measured) {
+      t_s = measured.t_s; Tj_C = measured.T_C;
+    } else {
+      t_s = makeLogTime(params.tMin_s, params.tMax_s, params.nPoints);
+      var dT = simulateTransient(cells, t_s, params.P_W, params.subSteps || 4);
+      var clean = new Float64Array(dT.length);
+      for (var i = 0; i < dT.length; i++) clean[i] = params.T0_C + dT[i];
+      Tj_C = addMeasurementNoise(clean, params.noise_C, params.seed);
+      var cleanArr = clean;
+    }
+    var Zth = calculateThermalImpedance(Tj_C, params.T0_C, params.P_W);
+
+    // 로그 시간 미분
+    var nz = Math.min(Math.max(t_s.length, 100), 400);
+    var rs = resampleLogTime(t_s, Zth, nz);
+    var zsm = smoothLogResponse(rs.y, params.smoothWindow, 2);
+    var hRaw = calculateLogDerivative(rs.z, rs.y);
+    var h = calculateLogDerivative(rs.z, zsm);
+
+    // 잡음 수준(로버스트 추정) 및 SNR 하한에 따른 유효 적합 시작점
+    //  Zth 가 잡음 수준보다 충분히 커지기 전 구간은 시간상수 추정에 사용하지 않는다.
+    var resid = [];
+    for (i = 0; i < rs.y.length; i++) resid.push(Math.abs(rs.y[i] - zsm[i]));
+    var sigZ = 1.4826 * median(resid);
+    var floorZ = Math.max(4 * sigZ, 1e-12);
+    var fitStart = 0;
+    while (fitStart < rs.y.length - 5 && zsm[fitStart] < floorZ) fitStart++;
+    fitStart = Math.min(fitStart, Math.floor(rs.y.length * 0.5));
+
+    // 시간상수 스펙트럼
+    var tau = makeTauGrid(t_s[0], t_s[t_s.length - 1], params.nTau);
+    var spec = estimateTimeConstantSpectrum(rs.z, h, tau, params.lambda, params.fistaIters || 1200, fitStart);
+
+    // Foster 축약 및 재구성
+    var foster = clusterSpectrumToFoster(tau, spec.r, params.fosterOrder);
+    var Zf = reconstructFosterResponse(t_s, foster);
+    var rmse = 0, maxAbsErr = 0;
+    for (i = 0; i < t_s.length; i++) { var e = Zf[i] - Zth[i]; rmse += e * e; maxAbsErr = Math.max(maxAbsErr, Math.abs(e)); }
+    rmse = Math.sqrt(rmse / t_s.length);
+    var Rf = foster.reduce(function (s, f) { return s + f.R_KW; }, 0);
+    var Rmeas = Zth[Zth.length - 1];
+    var ssErrPct = 100 * (Rf - Rmeas) / Math.max(Math.abs(Rmeas), 1e-12);
+
+    // Foster -> Cauer
+    var poly = foster.length ? buildFosterPolynomial(foster) : null;
+    var cauer = poly ? convertFosterToCauer(poly) : { stages: [], ok: false, warning: 'Foster 성분이 없습니다.' };
+
+    // Cauer 사다리의 시간응답(등가성 검증용)
+    var Zcauer = null, cauerEqRmse = null;
+    if (cauer.stages.length) {
+      var cCells = cauer.stages.map(function (s) { return { R_KW: Math.abs(s.R_KW), C_JK: Math.abs(s.C_JK) }; });
+      var dTc = simulateTransient(cCells, t_s, 1.0, 4);
+      Zcauer = dTc;
+      var acc = 0;
+      for (i = 0; i < t_s.length; i++) { var e2 = Zcauer[i] - Zf[i]; acc += e2 * e2; }
+      cauerEqRmse = Math.sqrt(acc / t_s.length);
+    }
+
+    return {
+      isUploaded: isUploaded,
+      t_s: t_s, Tj_C: Tj_C, Tclean_C: (typeof cleanArr !== 'undefined' ? cleanArr : null), Zth_KW: Zth,
+      z: rs.z, Zsm_KW: zsm, h_KW: h, hRaw_KW: hRaw,
+      tau_s: tau, spectrum: spec.r, specFit: spec.fit, specRmse: spec.rmse,
+      fitStart: fitStart, sigmaZ_KW: sigZ,
+      foster: foster, Zfoster_KW: Zf, fosterRmse_KW: rmse, fosterMaxErr_KW: maxAbsErr,
+      fosterRtot_KW: Rf, ssErr_pct: ssErrPct,
+      cauer: cauer, Zcauer_KW: Zcauer, cauerEqRmse_KW: cauerEqRmse,
+      sfExact: calculateExactStructureFunction(cells),
+      sfEstimated: calculateEstimatedStructureFunction(cauer.stages),
+      dsfExact: calculateDifferentialStructureFunction(cells),
+      dsfEstimated: calculateDifferentialStructureFunction(cauer.stages),
+      Rth_KW: Zth[Zth.length - 1]
+    };
+  }
+
+  /** 기본 파라미터 */
+  function defaultParams() {
+    return {
+      P_W: 10, T0_C: 25,
+      tMin_s: 1e-7, tMax_s: 10, nPoints: 300,
+      noise_C: 0.002, seed: 20240501, sameNoise: true,
+      nCell: 10, degradeIndex: 1, degradeFactor: 2.5,
+      smoothWindow: 11, nTau: 120, lambda: 1e-3,
+      fosterOrder: 8, divThreshold_KW: 0.01, divRelative_pct: 40, divConsecutive: 3,
+      subSteps: 4, fistaIters: 1200, showExact: false
+    };
+  }
+
+  /** runAnalysis : 정상/열화 전 파이프라인 실행 */
+  function runAnalysis(params, uploaded) {
+    uploaded = uploaded || {};
+    var layersN = createLayerModel({ layers: params.layers, degradeIndex: params.degradeIndex, degradeFactor: 1.0 });
+    var layersD = createLayerModel({ layers: params.layers, degradeIndex: params.degradeIndex, degradeFactor: params.degradeFactor });
+    var cellsN = buildCauerCells(layersN, params.nCell);
+    var cellsD = buildCauerCells(layersD, params.nCell);
+
+    var pN = Object.assign({}, params);
+    // 정상/열화는 서로 다른 시편을 따로 측정한 것이므로 기본적으로 잡음 실현이 다르다.
+    // sameNoise 를 켜면 동일한 잡음을 사용해, 두 곡선의 차이가 순수하게 물성 차이에서만 오도록 한다.
+    var pD = Object.assign({}, params, { seed: params.sameNoise ? params.seed : (params.seed + 1000) });
+
+    var caseN = analyzeCase(pN, layersN, cellsN, uploaded.normal || null);
+    var caseD = analyzeCase(pD, layersD, cellsD, uploaded.degraded || null);
+
+    var boundsN = layerBoundaries(layersN);
+    var boundsD = layerBoundaries(layersD);
+
+    var relFrac = (params.divRelative_pct === undefined ? 25 : params.divRelative_pct) / 100;
+    var divEst = detectStructureFunctionDivergence(caseN.sfEstimated, caseD.sfEstimated,
+      params.divThreshold_KW, params.divConsecutive, 300, relFrac);
+    var divExact = detectStructureFunctionDivergence(caseN.sfExact, caseD.sfExact,
+      params.divThreshold_KW, params.divConsecutive, 300, relFrac);
+
+    var diag = performPHMDiagnosis({
+      RthNormal_KW: caseN.Rth_KW, RthDegraded_KW: caseD.Rth_KW,
+      divergence: divEst.found ? divEst : divExact,
+      bounds: boundsN, layersNormal: layersN, P_W: params.P_W,
+      noise_C: params.noise_C
+    });
+
+    var res = {
+      params: params,
+      layersNormal: layersN, layersDegraded: layersD,
+      cellsNormal: cellsN, cellsDegraded: cellsD,
+      boundsNormal: boundsN, boundsDegraded: boundsD,
+      normal: caseN, degraded: caseD,
+      divergenceEstimated: divEst, divergenceExact: divExact,
+      diagnosis: diag,
+      RthTheoryNormal_KW: layersN.reduce(function (s, l) { return s + l.R_KW; }, 0),
+      RthTheoryDegraded_KW: layersD.reduce(function (s, l) { return s + l.R_KW; }, 0)
+    };
+    res.validation = validateResults(res);
+    return res;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * 12. 자동 검증
+   * ------------------------------------------------------------------------ */
+
+  // 감소량이 전체 변화폭의 0.5%를 넘는 경우만 '비단조'로 센다.
+  // (측정 잡음 수준의 미세한 요동을 비단조로 오판하지 않기 위함)
+  function isMonotonic(v, tolFrac) {
+    var maxV = v[v.length - 1] - v[0], bad = 0;
+    var eps = Math.abs(maxV) * 5e-3;
+    for (var i = 1; i < v.length; i++) if (v[i] < v[i - 1] - eps) bad++;
+    return bad <= Math.floor(v.length * (tolFrac || 0.02));
+  }
+
+  function hasBadNumber(res) {
+    var arrs = [res.normal.Zth_KW, res.degraded.Zth_KW, res.normal.h_KW, res.degraded.h_KW,
+      res.normal.spectrum, res.degraded.spectrum];
+    for (var i = 0; i < arrs.length; i++) {
+      var a = arrs[i];
+      for (var j = 0; j < a.length; j++) if (!isFinite(a[j])) return true;
+    }
+    var st = res.normal.cauer.stages.concat(res.degraded.cauer.stages);
+    for (i = 0; i < st.length; i++) if (!isFinite(st[i].R_KW) || !isFinite(st[i].C_JK)) return true;
+    return false;
+  }
+
+  /** validateResults : 검증 항목 12종 */
+  function validateResults(res) {
+    var p = res.params, out = [];
+    function add(item, ref, got, err, pass, note) {
+      out.push({ item: item, ref: ref, got: got, err: err, pass: pass, note: note || '' });
+    }
+    var n = res.normal, d = res.degraded;
+
+    // 1) 온도 응답 단조 증가
+    //    내부 시뮬레이션은 잡음 없는 원 응답으로, 업로드 데이터는 평활된 Zth 로 판정한다
+    //    (잡음이 큰 실측 데이터의 국소적 요동 때문에 오탐이 나는 것을 방지)
+    var monoN = isMonotonic(n.Tclean_C || n.Zsm_KW, 0.02);
+    var monoD = isMonotonic(d.Tclean_C || d.Zsm_KW, 0.02);
+    add('1. 과도 온도 응답 단조 증가', '단조 증가', (monoN && monoD) ? '정상/열화 모두 단조' : '비단조 구간 존재', '-', monoN && monoD);
+
+    // 2) 최종 Zth 와 이론 총 열저항 일치 (1% 이내)
+    var e2 = 100 * Math.abs(n.Rth_KW - res.RthTheoryNormal_KW) / res.RthTheoryNormal_KW;
+    add('2. 최종 Zth vs 이론 ΣR (정상)', res.RthTheoryNormal_KW.toFixed(5) + ' K/W', n.Rth_KW.toFixed(5) + ' K/W', e2.toFixed(3) + ' %', e2 < 1.0);
+
+    // 3) 정상 총 열저항 0.6077
+    var e3 = 100 * Math.abs(res.RthTheoryNormal_KW - 0.60769) / 0.60769;
+    add('3. 정상 총 열저항', '0.60769 K/W', res.RthTheoryNormal_KW.toFixed(5) + ' K/W', e3.toFixed(3) + ' %', e3 < 1.0,
+      p.degradeIndex === 1 ? '' : '열화 대상층 변경됨');
+
+    // 4) 열화 배율 2.5 에서 Layer2 열저항 0.4167
+    var R2d = res.layersDegraded[1].R_KW;
+    var ref4 = 0.16667 * (p.degradeIndex === 1 ? p.degradeFactor : 1);
+    var e4 = 100 * Math.abs(R2d - ref4) / ref4;
+    add('4. Layer 2 열화 후 열저항', ref4.toFixed(5) + ' K/W', R2d.toFixed(5) + ' K/W', e4.toFixed(3) + ' %', e4 < 1.0);
+
+    // 5) 열화 총 열저항
+    var e5 = 100 * Math.abs(d.Rth_KW - res.RthTheoryDegraded_KW) / res.RthTheoryDegraded_KW;
+    add('5. 열화 총 열저항', res.RthTheoryDegraded_KW.toFixed(5) + ' K/W', d.Rth_KW.toFixed(5) + ' K/W', e5.toFixed(3) + ' %', e5 < 1.0);
+
+    // 6) 정상상태 온도차
+    var dT = p.P_W * (res.RthTheoryDegraded_KW - res.RthTheoryNormal_KW);
+    var dTm = d.Tj_C[d.Tj_C.length - 1] - n.Tj_C[n.Tj_C.length - 1];
+    var e6 = Math.abs(dTm - dT);
+    add('6. 정상-열화 정상상태 온도차', dT.toFixed(3) + ' °C', dTm.toFixed(3) + ' °C', e6.toFixed(4) + ' °C', e6 < Math.max(0.05, 0.02 * Math.abs(dT)));
+
+    // 7) Foster 재구성 RMSE
+    //    총 열저항의 5% 이내면 축약 모델로서 충분한 정확도로 본다
+    var rmseLim = Math.max(0.02, 0.05 * res.RthTheoryNormal_KW);
+    add('7. Foster 재구성 RMSE (정상)', '< ' + rmseLim.toFixed(3) + ' K/W',
+      n.fosterRmse_KW.toExponential(3) + ' K/W',
+      (100 * n.fosterRmse_KW / res.RthTheoryNormal_KW).toFixed(2) + ' %', n.fosterRmse_KW < rmseLim);
+
+    // 8) Foster-Cauer 등가성
+    var eq = n.cauerEqRmse_KW;
+    add('8. Foster–Cauer 등가성 오차 (정상)', '< 0.005 K/W', (eq === null ? '계산 불가' : eq.toExponential(3) + ' K/W'), '-', eq !== null && eq < 0.005);
+
+    // 9) 정답 구조함수의 5개 층 구간 구분
+    var okLayers = res.boundsNormal.length === 5 && res.boundsNormal[4].Rcum_KW > res.boundsNormal[3].Rcum_KW;
+    add('9. 정답 구조함수 층 구간 구분', '5개 구간', okLayers ? '5개 구간 확인' : '구분 실패', '-', okLayers);
+
+    // 10) 최초 분기 위치 (열화 배율 1.0이면 '분기 없음'이 정답이다)
+    var di = res.diagnosis.layerIndex;
+    var target = p.degradeIndex;
+    var isNormalCase = (p.degradeFactor <= 1.001);
+    var got10 = (di === null) ? '분기 없음' : ('Layer ' + (di + 1) + ' (' + res.diagnosis.layerName + ')');
+    add('10. 구조함수 최초 분기 위치',
+      isNormalCase ? '분기 없음' : ('Layer ' + (target + 1)),
+      got10, '-',
+      isNormalCase ? (di === null) : (di === target),
+      isNormalCase ? '열화 배율 1.0 : 두 구조함수가 같아야 한다' : (di === null ? '열화량이 작아 분기 미검출 (검출 한계)' : ''));
+
+    // 11) NaN/Inf
+    var bad = hasBadNumber(res);
+    add('11. NaN 또는 Infinity 여부', '없음', bad ? '존재' : '없음', '-', !bad);
+
+    // 12) 음수 R/C 경고
+    var neg = !n.cauer.ok || !d.cauer.ok;
+    add('12. 음수 열저항/열용량 발생', '없음', neg ? '발생 (경고 표시)' : '없음', '-', !neg);
+
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * export
+   * ------------------------------------------------------------------------ */
+  var TSF = {
+    AREA_M2: AREA_M2, DEFAULT_LAYERS: DEFAULT_LAYERS, PRESETS: PRESETS,
+    makeRng: makeRng, gaussian: gaussian,
+    createLayerModel: createLayerModel, buildCauerCells: buildCauerCells, layerBoundaries: layerBoundaries,
+    buildThermalMatrices: buildThermalMatrices, solveTridiagonal: solveTridiagonal,
+    simulateTransient: simulateTransient, addMeasurementNoise: addMeasurementNoise,
+    calculateThermalImpedance: calculateThermalImpedance, makeLogTime: makeLogTime,
+    resampleLogTime: resampleLogTime, smoothLogResponse: smoothLogResponse,
+    calculateLogDerivative: calculateLogDerivative,
+    makeTauGrid: makeTauGrid, buildDeconvKernel: buildDeconvKernel,
+    solveNonnegativeTikhonov: solveNonnegativeTikhonov, estimateTimeConstantSpectrum: estimateTimeConstantSpectrum,
+    clusterSpectrumToFoster: clusterSpectrumToFoster, reconstructFosterResponse: reconstructFosterResponse,
+    polyAdd: polyAdd, polySub: polySub, polyMul: polyMul, polyScale: polyScale, polyMulS: polyMulS,
+    polyLead: polyLead, polyDropLead: polyDropLead, polyNormalize: polyNormalize, polyEvalComplex: polyEvalComplex,
+    buildFosterPolynomial: buildFosterPolynomial, convertFosterToCauer: convertFosterToCauer,
+    calculateExactStructureFunction: calculateExactStructureFunction,
+    calculateEstimatedStructureFunction: calculateEstimatedStructureFunction,
+    calculateDifferentialStructureFunction: calculateDifferentialStructureFunction,
+    detectStructureFunctionDivergence: detectStructureFunctionDivergence,
+    performPHMDiagnosis: performPHMDiagnosis, validateResults: validateResults,
+    parseCsvTimeTemp: parseCsvTimeTemp, exportCSV: exportCSV, formatNum: formatNum,
+    defaultParams: defaultParams, runAnalysis: runAnalysis, analyzeCase: analyzeCase,
+    interpRatC: interpRatC, median: median
+  };
+
+  root.TSF = TSF;
+  if (typeof module !== 'undefined' && module.exports) module.exports = TSF;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* =============================================================================
+ *  UI 레이어 : SVG 차트 엔진 · 개념도 · 표 · CSV/PNG 내보내기 · 이벤트 바인딩
+ * ========================================================================== */
+(function () {
+  'use strict';
+  var T = window.TSF;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  var COL = {
+    normal: '#12556E', degraded: '#C0392B', exact: '#5A6B78',
+    grid: '#E3EAEF', axis: '#8FA3B0', ink: '#10222E', ink2: '#3B5261',
+    target: '#B36B00', cyan: '#1C7C99'
+  };
+  var LAYER_FILL = ['#E8F0F5', '#FBE8E4', '#FBF2DF', '#E7F3EA', '#EDEAF6'];
+  var FONT = 'Noto Sans KR, Malgun Gothic, sans-serif';
+  var MONO = 'Consolas, D2Coding, monospace';
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  1. SVG 차트 엔진
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  /** 유한하고 (로그축이면) 양수인 값만 통과 */
+  function ok(v, isLog) { return isFinite(v) && (!isLog || v > 0); }
+
+  /** 선형축 눈금 (1,2,5 x 10^k) */
+  function linTicks(min, max, target) {
+    var span = max - min; if (!(span > 0)) return [min];
+    var raw = span / (target || 5);
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var norm = raw / mag, step;
+    step = (norm < 1.5) ? 1 : (norm < 3 ? 2 : (norm < 7 ? 5 : 10));
+    step *= mag;
+    var t = [], s = Math.ceil(min / step) * step;
+    for (var v = s; v <= max * (1 + 1e-12); v += step) t.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+    return t;
+  }
+
+  /** 로그축 눈금 : {v, major} */
+  function logTicks(min, max) {
+    var k0 = Math.floor(Math.log(min) / Math.LN10), k1 = Math.ceil(Math.log(max) / Math.LN10), out = [];
+    for (var k = k0; k <= k1; k++) {
+      var base = Math.pow(10, k);
+      if (base >= min * 0.999 && base <= max * 1.001) out.push({ v: base, major: true, exp: k });
+      for (var m = 2; m <= 9; m++) {
+        var v = base * m;
+        if (v >= min * 0.999 && v <= max * 1.001) out.push({ v: v, major: false });
+      }
+    }
+    return out;
+  }
+
+  /** 숫자 표기 */
+  function fmt(v, sig) {
+    if (!isFinite(v)) return '—';
+    if (v === 0) return '0';
+    var a = Math.abs(v);
+    if (a >= 1e5 || a < 1e-3) return v.toExponential(sig === undefined ? 3 : sig);
+    return v.toPrecision(sig === undefined ? 4 : sig).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  }
+
+  /** 10^k 형태의 눈금 라벨 (위첨자) */
+  function expLabel(parent, x, y, k) {
+    var g = el('text', { x: x, y: y, 'text-anchor': 'middle', 'font-family': MONO, 'font-size': 11, fill: COL.ink2 });
+    g.appendChild(el('tspan', {}, '10'));
+    var sup = el('tspan', { dy: -5, 'font-size': 8.5 }, String(k));
+    g.appendChild(sup);
+    parent.appendChild(g);
+  }
+
+  /**
+   * drawChart : 범용 SVG 차트
+   * cfg = {title,xLabel,yLabel,xLog,yLog,xMin..,series:[{name,x,y,color,dash,width,type,marker}],
+   *        bands:[{x0,x1,fill,label}], annotations:[{x,y,text,tx,ty}], hideLegend}
+   */
+  function drawChart(hostId, cfg) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    host.innerHTML = '';
+    var W = 780, H = cfg.height || 420, M = { l: 76, r: 20, t: 30, b: 54 };
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, 'font-family': FONT });
+    svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: '#FFFFFF' }));
+
+    var S = (cfg.series || []).filter(function (s) { return s.x && s.x.length; });
+
+    // ── 데이터 범위
+    var xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    S.forEach(function (s) {
+      for (var i = 0; i < s.x.length; i++) {
+        var X = s.x[i], Y = s.y[i];
+        if (!ok(X, cfg.xLog) || !ok(Y, cfg.yLog)) continue;
+        if (X < xmin) xmin = X; if (X > xmax) xmax = X;
+        if (Y < ymin) ymin = Y; if (Y > ymax) ymax = Y;
+      }
+    });
+    if (!isFinite(xmin)) { xmin = 0; xmax = 1; }
+    if (!isFinite(ymin)) { ymin = 0; ymax = 1; }
+    if (cfg.xMin !== undefined) xmin = cfg.xMin; if (cfg.xMax !== undefined) xmax = cfg.xMax;
+    if (cfg.yMin !== undefined) ymin = cfg.yMin; if (cfg.yMax !== undefined) ymax = cfg.yMax;
+    if (cfg.yLog) { if (!(ymin > 0)) ymin = ymax * 1e-6; ymin *= 0.6; ymax *= 1.6; }
+    else { var pad = (ymax - ymin) * 0.08 || Math.abs(ymax) * 0.1 || 1; ymin -= pad; ymax += pad; if (cfg.yZero && ymin > 0) ymin = 0; }
+    if (cfg.xLog) { /* 로그 x 는 데이터 범위 그대로 */ }
+    else { var px = (xmax - xmin) * 0.03 || 1; xmin -= px; xmax += px; }
+    if (xmax <= xmin) xmax = xmin + 1;
+    if (ymax <= ymin) ymax = ymin + 1;
+
+    var lx0 = cfg.xLog ? Math.log(xmin) : xmin, lx1 = cfg.xLog ? Math.log(xmax) : xmax;
+    var ly0 = cfg.yLog ? Math.log(ymin) : ymin, ly1 = cfg.yLog ? Math.log(ymax) : ymax;
+    function sx(v) { return M.l + ((cfg.xLog ? Math.log(v) : v) - lx0) / (lx1 - lx0) * pw; }
+    function sy(v) { return M.t + ph - ((cfg.yLog ? Math.log(v) : v) - ly0) / (ly1 - ly0) * ph; }
+    function ix(px2) { var f = (px2 - M.l) / pw, u = lx0 + f * (lx1 - lx0); return cfg.xLog ? Math.exp(u) : u; }
+
+    // ── 층 밴드
+    (cfg.bands || []).forEach(function (b, i) {
+      var a = sx(Math.max(b.x0, xmin)), c = sx(Math.min(b.x1, xmax));
+      if (c <= a) return;
+      svg.appendChild(el('rect', { x: a, y: M.t, width: c - a, height: ph, fill: b.fill || LAYER_FILL[i % 5], opacity: 0.85 }));
+      if (b.label && c - a > 26) {
+        svg.appendChild(el('text', {
+          x: (a + c) / 2, y: cfg.bandLabelBottom ? (M.t + ph - 6) : (M.t + 13), 'text-anchor': 'middle', 'font-size': 10,
+          fill: b.strong ? COL.target : COL.ink2, 'font-weight': b.strong ? 700 : 400
+        }, b.label));
+      }
+    });
+
+    // ── 격자 및 눈금
+    var gx = el('g', {}), gy = el('g', {});
+    if (cfg.xLog) {
+      logTicks(xmin, xmax).forEach(function (t) {
+        var X = sx(t.v);
+        gx.appendChild(el('line', { x1: X, y1: M.t, x2: X, y2: M.t + ph, stroke: COL.grid, 'stroke-width': t.major ? 1 : 0.5 }));
+        if (t.major) {
+          gx.appendChild(el('line', { x1: X, y1: M.t + ph, x2: X, y2: M.t + ph + 5, stroke: COL.axis }));
+          expLabel(gx, X, M.t + ph + 18, t.exp);
+        }
+      });
+    } else {
+      linTicks(xmin, xmax, 6).forEach(function (v) {
+        var X = sx(v);
+        gx.appendChild(el('line', { x1: X, y1: M.t, x2: X, y2: M.t + ph, stroke: COL.grid }));
+        gx.appendChild(el('line', { x1: X, y1: M.t + ph, x2: X, y2: M.t + ph + 5, stroke: COL.axis }));
+        gx.appendChild(el('text', { x: X, y: M.t + ph + 18, 'text-anchor': 'middle', 'font-size': 11, 'font-family': MONO, fill: COL.ink2 }, fmt(v, 3)));
+      });
+    }
+    if (cfg.yLog) {
+      logTicks(ymin, ymax).forEach(function (t) {
+        var Y = sy(t.v);
+        gy.appendChild(el('line', { x1: M.l, y1: Y, x2: M.l + pw, y2: Y, stroke: COL.grid, 'stroke-width': t.major ? 1 : 0.5 }));
+        if (t.major) {
+          gy.appendChild(el('line', { x1: M.l - 5, y1: Y, x2: M.l, y2: Y, stroke: COL.axis }));
+          var g = el('text', { x: M.l - 9, y: Y + 4, 'text-anchor': 'end', 'font-family': MONO, 'font-size': 11, fill: COL.ink2 });
+          g.appendChild(el('tspan', {}, '10'));
+          g.appendChild(el('tspan', { dy: -5, 'font-size': 8.5 }, String(t.exp)));
+          gy.appendChild(g);
+        }
+      });
+    } else {
+      linTicks(ymin, ymax, 6).forEach(function (v) {
+        var Y = sy(v);
+        gy.appendChild(el('line', { x1: M.l, y1: Y, x2: M.l + pw, y2: Y, stroke: COL.grid }));
+        gy.appendChild(el('line', { x1: M.l - 5, y1: Y, x2: M.l, y2: Y, stroke: COL.axis }));
+        gy.appendChild(el('text', { x: M.l - 9, y: Y + 4, 'text-anchor': 'end', 'font-size': 11, 'font-family': MONO, fill: COL.ink2 }, fmt(v, 3)));
+      });
+    }
+    svg.appendChild(gx); svg.appendChild(gy);
+    if (!cfg.yLog && ymin < 0 && ymax > 0) {
+      svg.appendChild(el('line', { x1: M.l, y1: sy(0), x2: M.l + pw, y2: sy(0), stroke: COL.axis, 'stroke-width': 1.2 }));
+    }
+
+    // ── 데이터
+    S.forEach(function (s) {
+      var d = '', started = false, pts = [];
+      for (var i = 0; i < s.x.length; i++) {
+        var X = s.x[i], Y = s.y[i];
+        if (!ok(X, cfg.xLog) || !ok(Y, cfg.yLog) || X < xmin || X > xmax) { started = false; continue; }
+        var px2 = sx(X), py = sy(Math.min(Math.max(Y, ymin), ymax));
+        pts.push([px2, py, X, Y]);
+        d += (started ? 'L' : 'M') + px2.toFixed(2) + ',' + py.toFixed(2) + ' ';
+        started = true;
+      }
+      if (s.type === 'bar') {
+        var g2 = el('g', {});
+        for (i = 0; i < pts.length; i++) {
+          if (pts[i][3] <= (cfg.yLog ? ymin : 0)) continue;
+          g2.appendChild(el('line', { x1: pts[i][0], y1: sy(cfg.yLog ? ymin : 0), x2: pts[i][0], y2: pts[i][1], stroke: s.color, 'stroke-width': s.width || 2, opacity: s.opacity || 0.9 }));
+        }
+        svg.appendChild(g2);
+      } else {
+        svg.appendChild(el('path', {
+          d: d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 1.8,
+          'stroke-dasharray': s.dash || null, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: s.opacity || 1
+        }));
+      }
+      if (s.marker && pts.length) {
+        var step = Math.max(1, Math.round(pts.length / (s.markerCount || 14))), gm = el('g', {});
+        for (i = 0; i < pts.length; i += step) gm.appendChild(markerEl(s.marker, pts[i][0], pts[i][1], s.color));
+        if (pts.length && (pts.length - 1) % step !== 0) gm.appendChild(markerEl(s.marker, pts[pts.length - 1][0], pts[pts.length - 1][1], s.color));
+        svg.appendChild(gm);
+      }
+      s._pts = pts;
+    });
+
+    // ── 주석 / 수직선
+    (cfg.vlines || []).forEach(function (v) {
+      if (!ok(v.x, cfg.xLog) || v.x < xmin || v.x > xmax) return;
+      var X = sx(v.x);
+      svg.appendChild(el('line', { x1: X, y1: M.t, x2: X, y2: M.t + ph, stroke: v.color || COL.target, 'stroke-width': 1.2, 'stroke-dasharray': v.dash || '5,3' }));
+      if (v.label) svg.appendChild(el('text', { x: X + 4, y: M.t + (v.ly || 30), 'font-size': 10.5, fill: v.color || COL.target, 'font-weight': 600 }, v.label));
+    });
+    (cfg.annotations || []).forEach(function (a) {
+      var X = sx(a.x), Y = sy(a.y), TX = X + (a.dx || 0), TY = Y + (a.dy || -18);
+      svg.appendChild(el('path', {
+        d: 'M' + TX + ',' + TY + ' L' + X + ',' + Y, stroke: a.color || COL.target, 'stroke-width': 1.1, fill: 'none',
+        'marker-end': null
+      }));
+      svg.appendChild(el('circle', { cx: X, cy: Y, r: 3, fill: a.color || COL.target }));
+      var t2 = el('text', { x: TX, y: TY - 3, 'font-size': 10.5, fill: a.color || COL.target, 'font-weight': 600, 'text-anchor': a.anchor || 'middle' }, a.text);
+      svg.appendChild(t2);
+    });
+
+    // ── 축 테두리 및 라벨
+    svg.appendChild(el('rect', { x: M.l, y: M.t, width: pw, height: ph, fill: 'none', stroke: COL.axis }));
+    if (cfg.title) svg.appendChild(el('text', { x: M.l, y: 18, 'font-size': 13, 'font-weight': 700, fill: COL.ink }, cfg.title));
+    if (cfg.xLabel) svg.appendChild(el('text', { x: M.l + pw / 2, y: H - 12, 'text-anchor': 'middle', 'font-size': 11.5, fill: COL.ink2 }, cfg.xLabel));
+    if (cfg.yLabel) svg.appendChild(el('text', {
+      x: 14, y: M.t + ph / 2, 'text-anchor': 'middle', 'font-size': 11.5, fill: COL.ink2,
+      transform: 'rotate(-90 14 ' + (M.t + ph / 2) + ')'
+    }, cfg.yLabel));
+
+    // ── 범례
+    if (!cfg.hideLegend) {
+      var names = S.filter(function (s) { return s.name; });
+      var lw = 0; names.forEach(function (s) { lw = Math.max(lw, s.name.length); });
+      var boxW = Math.min(pw - 12, lw * 6.6 + 40), boxH = names.length * 15 + 8;
+      var lx = cfg.legendLeft ? (M.l + 8) : (M.l + pw - boxW - 8), ly = M.t + 8;
+      if (cfg.legendBottom) ly = M.t + ph - boxH - 8;
+      var lg = el('g', {});
+      lg.appendChild(el('rect', { x: lx, y: ly, width: boxW, height: boxH, fill: '#FFFFFF', opacity: 0.88, stroke: COL.grid }));
+      names.forEach(function (s, i) {
+        var yy = ly + 14 + i * 15;
+        lg.appendChild(el('line', { x1: lx + 6, y1: yy - 4, x2: lx + 28, y2: yy - 4, stroke: s.color, 'stroke-width': s.width || 1.8, 'stroke-dasharray': s.dash || null }));
+        if (s.marker) lg.appendChild(markerEl(s.marker, lx + 17, yy - 4, s.color));
+        lg.appendChild(el('text', { x: lx + 33, y: yy, 'font-size': 10.5, fill: COL.ink }, s.name));
+      });
+      svg.appendChild(lg);
+    }
+
+    // ── 마우스 위치 값 표시
+    var hoverG = el('g', { visibility: 'hidden' });
+    var hLine = el('line', { y1: M.t, y2: M.t + ph, stroke: COL.ink2, 'stroke-width': 0.8, 'stroke-dasharray': '3,3' });
+    hoverG.appendChild(hLine);
+    var dots = S.map(function () { var c = el('circle', { r: 3.5, fill: '#fff', 'stroke-width': 2 }); hoverG.appendChild(c); return c; });
+    svg.appendChild(hoverG);
+    var overlay = el('rect', { x: M.l, y: M.t, width: pw, height: ph, fill: 'transparent', style: 'cursor:crosshair' });
+    svg.appendChild(overlay);
+
+    var tip = document.createElement('div'); tip.className = 'tip'; host.appendChild(tip);
+    host.appendChild(svg);
+
+    overlay.addEventListener('mousemove', function (ev) {
+      var r = svg.getBoundingClientRect(), scale = W / r.width;
+      var mx = (ev.clientX - r.left) * scale;
+      var xv = ix(mx);
+      hLine.setAttribute('x1', mx); hLine.setAttribute('x2', mx);
+      hoverG.setAttribute('visibility', 'visible');
+      var lines = [(cfg.xName || 'x') + ' = ' + fmt(xv, 4) + (cfg.xUnit ? ' ' + cfg.xUnit : '')];
+      S.forEach(function (s, i) {
+        var p = nearest(s._pts, mx);
+        if (!p) { dots[i].setAttribute('visibility', 'hidden'); return; }
+        dots[i].setAttribute('visibility', 'visible');
+        dots[i].setAttribute('cx', p[0]); dots[i].setAttribute('cy', p[1]); dots[i].setAttribute('stroke', s.color);
+        if (s.name) lines.push(s.name + ' : ' + fmt(p[3], 4) + (cfg.yUnit ? ' ' + cfg.yUnit : ''));
+      });
+      tip.textContent = lines.join('\n');
+      tip.style.opacity = 1;
+      var tx = (mx / scale) + 14, ty = ((ev.clientY - r.top)) - 10;
+      if (tx > r.width - 170) tx -= 190;
+      tip.style.left = tx + 'px'; tip.style.top = Math.max(0, ty) + 'px';
+    });
+    overlay.addEventListener('mouseleave', function () { hoverG.setAttribute('visibility', 'hidden'); tip.style.opacity = 0; });
+  }
+
+  function markerEl(kind, x, y, color) {
+    if (kind === 'square') return el('rect', { x: x - 3, y: y - 3, width: 6, height: 6, fill: '#fff', stroke: color, 'stroke-width': 1.4 });
+    if (kind === 'triangle') return el('path', { d: 'M' + x + ',' + (y - 4) + ' L' + (x + 3.6) + ',' + (y + 2.6) + ' L' + (x - 3.6) + ',' + (y + 2.6) + ' Z', fill: '#fff', stroke: color, 'stroke-width': 1.4 });
+    if (kind === 'diamond') return el('path', { d: 'M' + x + ',' + (y - 4) + ' L' + (x + 4) + ',' + y + ' L' + x + ',' + (y + 4) + ' L' + (x - 4) + ',' + y + ' Z', fill: '#fff', stroke: color, 'stroke-width': 1.4 });
+    return el('circle', { cx: x, cy: y, r: 3, fill: '#fff', stroke: color, 'stroke-width': 1.4 });
+  }
+
+  function nearest(pts, mx) {
+    if (!pts || !pts.length) return null;
+    var lo = 0, hi = pts.length - 1;
+    while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (pts[mid][0] <= mx) lo = mid; else hi = mid; }
+    return (Math.abs(pts[lo][0] - mx) <= Math.abs(pts[hi][0] - mx)) ? pts[lo] : pts[hi];
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  2. 개념도 (drawSchematics)
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  /** 그림 1 : 5층 패키지 수직 개념도 */
+  function fig1(layersN, layersD, params) {
+    var W = 780, x0 = 150, bw = 300;
+    var hs = layersN.map(function (l) {
+      var um = l.L_m * 1e6;
+      return 26 + 30 * (Math.log(um) / Math.LN10 - 1.5) / 2.2;
+    });
+    var y = 46, rows = [];
+    for (var i = 0; i < 5; i++) { rows.push({ y: y, h: hs[i] }); y += hs[i] + 20; }
+    var H = y + 66;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="' + FONT + '" style="width:100%;height:auto">';
+    s += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>';
+    // heat source
+    s += '<rect x="' + x0 + '" y="8" width="' + bw + '" height="26" fill="#152836"/>';
+    s += '<text x="' + (x0 + bw / 2) + '" y="26" text-anchor="middle" font-size="12.5" fill="#fff" font-weight="700">Heat source · P = ' + fmt(params.P_W, 3) + ' W</text>';
+    s += '<path d="M' + (x0 + bw / 2) + ',34 L' + (x0 + bw / 2) + ',44" stroke="#152836" stroke-width="1.6"/>';
+    s += '<path d="M' + (x0 + bw / 2 - 4) + ',41 L' + (x0 + bw / 2) + ',46 L' + (x0 + bw / 2 + 4) + ',41 Z" fill="#152836"/>';
+
+    for (i = 0; i < 5; i++) {
+      var L = layersN[i], r = rows[i], isT = (i === params.degradeIndex);
+      s += '<rect x="' + x0 + '" y="' + r.y + '" width="' + bw + '" height="' + r.h + '" fill="' + LAYER_FILL[i] + '" stroke="' + (isT ? COL.degraded : COL.ink2) + '" stroke-width="' + (isT ? 2.4 : 1) + '"/>';
+      s += '<text x="' + (x0 + 10) + '" y="' + (r.y + r.h / 2 + 4) + '" font-size="12.5" font-weight="700" fill="' + COL.ink + '">Layer ' + (i + 1) + ' · ' + esc(L.name) + '</text>';
+      // 좌측 : 형상/물성
+      s += '<text x="' + (x0 - 10) + '" y="' + (r.y + r.h / 2 - 3) + '" text-anchor="end" font-size="10.5" font-family="' + MONO + '" fill="' + COL.ink2 + '">L=' + fmt(L.L_m * 1e3, 3) + ' mm, k=' + fmt(L.k0_WmK, 4) + '</text>';
+      s += '<text x="' + (x0 - 10) + '" y="' + (r.y + r.h / 2 + 11) + '" text-anchor="end" font-size="10.5" font-family="' + MONO + '" fill="' + COL.ink2 + '">cv=' + (L.cv_Jm3K / 1e6).toFixed(2) + 'e6 J/m³K</text>';
+      // 우측 : R, C
+      s += '<text x="' + (x0 + bw + 12) + '" y="' + (r.y + r.h / 2 - 3) + '" font-size="10.5" font-family="' + MONO + '" fill="' + COL.normal + '">R=' + L.R_KW.toFixed(5) + ' K/W</text>';
+      s += '<text x="' + (x0 + bw + 12) + '" y="' + (r.y + r.h / 2 + 11) + '" font-size="10.5" font-family="' + MONO + '" fill="' + COL.normal + '">C=' + L.C_JK.toFixed(4) + ' J/K</text>';
+      if (isT) {
+        s += '<text x="' + (x0 + bw + 12) + '" y="' + (r.y + r.h / 2 + 25) + '" font-size="10.5" font-family="' + MONO + '" fill="' + COL.degraded + '" font-weight="700">열화 R=' + layersD[i].R_KW.toFixed(5) + ' K/W</text>';
+        s += '<text x="' + (x0 - 10) + '" y="' + (r.y - 5) + '" text-anchor="end" font-size="11" fill="' + COL.degraded + '" font-weight="700">◀ 열화 대상층</text>';
+      }
+      var cy = r.y + r.h;
+      if (i < 4) {
+        s += '<path d="M' + (x0 + bw / 2) + ',' + cy + ' L' + (x0 + bw / 2) + ',' + (cy + 14) + '" stroke="' + COL.ink2 + '" stroke-width="1.4"/>';
+        s += '<path d="M' + (x0 + bw / 2 - 4) + ',' + (cy + 11) + ' L' + (x0 + bw / 2) + ',' + (cy + 16) + ' L' + (x0 + bw / 2 + 4) + ',' + (cy + 11) + ' Z" fill="' + COL.ink2 + '"/>';
+      }
+    }
+    var yb = rows[4].y + rows[4].h + 20;
+    s += '<path d="M' + (x0 + bw / 2) + ',' + (yb - 20) + ' L' + (x0 + bw / 2) + ',' + (yb - 6) + '" stroke="' + COL.ink2 + '" stroke-width="1.4"/>';
+    s += '<rect x="' + x0 + '" y="' + yb + '" width="' + bw + '" height="24" fill="#DDE6EB" stroke="' + COL.ink2 + '"/>';
+    s += '<text x="' + (x0 + bw / 2) + '" y="' + (yb + 16) + '" text-anchor="middle" font-size="12" fill="' + COL.ink + '">Ambient · 일정 온도 경계 T₀ = ' + fmt(params.T0_C, 4) + ' °C</text>';
+    var Rt = layersN.reduce(function (a, l) { return a + l.R_KW; }, 0);
+    s += '<text x="' + (x0 + bw + 12) + '" y="' + (yb + 16) + '" font-size="11" font-family="' + MONO + '" fill="' + COL.ink + '" font-weight="700">ΣR = ' + Rt.toFixed(5) + ' K/W</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  /** 그림 2 : Cauer 셀 분할 개념도 */
+  function fig2(layersN, nCell, degradeIndex) {
+    var W = 780, x0 = 132, bw = 470, H = 40 + 5 * 44 + 46;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="' + FONT + '" style="width:100%;height:auto">';
+    s += '<rect width="' + W + '" height="' + H + '" fill="#fff"/>';
+    s += '<text x="10" y="18" font-size="12" fill="' + COL.ink2 + '">공간 분할 → 1D 열확산 재현 → 총 ' + (5 * nCell) + '단 Cauer ladder</text>';
+    var gap = 3, cw = (bw - gap * (nCell - 1)) / nCell;
+    for (var i = 0; i < 5; i++) {
+      var y = 34 + i * 44, L = layersN[i], isT = (i === degradeIndex);
+      s += '<text x="' + (x0 - 10) + '" y="' + (y + 18) + '" text-anchor="end" font-size="11.5" font-weight="' + (isT ? 700 : 400) + '" fill="' + (isT ? COL.degraded : COL.ink) + '">Layer ' + (i + 1) + ' = ' + nCell + ' cells</text>';
+      for (var j = 0; j < nCell; j++) {
+        s += '<rect x="' + (x0 + j * (cw + gap)) + '" y="' + y + '" width="' + cw + '" height="26" fill="' + LAYER_FILL[i] + '" stroke="' + (isT ? COL.degraded : COL.ink2) + '" stroke-width="' + (isT ? 1.5 : 0.8) + '"/>';
+      }
+      s += '<text x="' + (x0 + bw + 10) + '" y="' + (y + 11) + '" font-size="10" font-family="' + MONO + '" fill="' + COL.ink2 + '">Rc=' + (L.R_KW / nCell).toExponential(2) + '</text>';
+      s += '<text x="' + (x0 + bw + 10) + '" y="' + (y + 23) + '" font-size="10" font-family="' + MONO + '" fill="' + COL.ink2 + '">Cc=' + (L.C_JK / nCell).toExponential(2) + '</text>';
+    }
+    var yy = 34 + 5 * 44 + 6;
+    s += '<path d="M' + x0 + ',' + yy + ' L' + (x0 + bw) + ',' + yy + '" stroke="' + COL.cyan + '" stroke-width="1.4"/>';
+    s += '<path d="M' + (x0 + bw - 7) + ',' + (yy - 4) + ' L' + (x0 + bw) + ',' + yy + ' L' + (x0 + bw - 7) + ',' + (yy + 4) + ' Z" fill="' + COL.cyan + '"/>';
+    s += '<text x="' + (x0 + bw / 2) + '" y="' + (yy + 18) + '" text-anchor="middle" font-size="11.5" fill="' + COL.cyan + '">열원 → 주변 방향의 1D 열확산 경로 (Rcell = Rlayer/N, Ccell = Clayer/N)</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  /** 그림 3 : Foster vs Cauer */
+  function fig3() {
+    var W = 780, H = 250;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="' + FONT + '" style="width:100%;height:auto">';
+    s += '<rect width="' + W + '" height="' + H + '" fill="#fff"/>';
+    s += '<line x1="390" y1="14" x2="390" y2="' + (H - 10) + '" stroke="' + COL.grid + '"/>';
+    // Foster : 직렬로 이어진 병렬 RC 모드
+    s += '<text x="16" y="20" font-size="13" font-weight="700" fill="' + COL.ink + '">Foster · 병렬 RC 모드의 직렬 연결</text>';
+    var y0 = 62;
+    s += '<text x="16" y="' + (y0 + 6) + '" font-size="11" fill="' + COL.ink2 + '">열원</text>';
+    s += '<line x1="44" y1="' + y0 + '" x2="70" y2="' + y0 + '" stroke="' + COL.ink + '" stroke-width="1.4"/>';
+    for (var i = 0; i < 3; i++) {
+      var x = 70 + i * 100;
+      s += '<line x1="' + x + '" y1="' + y0 + '" x2="' + x + '" y2="' + (y0 - 22) + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + x + '" y1="' + y0 + '" x2="' + x + '" y2="' + (y0 + 22) + '" stroke="' + COL.ink + '"/>';
+      s += '<rect x="' + (x + 14) + '" y="' + (y0 - 30) + '" width="46" height="16" fill="#fff" stroke="' + COL.normal + '" stroke-width="1.4"/>';
+      s += '<text x="' + (x + 37) + '" y="' + (y0 - 18) + '" text-anchor="middle" font-size="10" font-family="' + MONO + '" fill="' + COL.normal + '">R' + (i + 1) + '</text>';
+      s += '<line x1="' + x + '" y1="' + (y0 - 22) + '" x2="' + (x + 14) + '" y2="' + (y0 - 22) + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + (x + 60) + '" y1="' + (y0 - 22) + '" x2="' + (x + 74) + '" y2="' + (y0 - 22) + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + (x + 26) + '" y1="' + (y0 + 16) + '" x2="' + (x + 48) + '" y2="' + (y0 + 16) + '" stroke="' + COL.normal + '" stroke-width="2"/>';
+      s += '<line x1="' + (x + 26) + '" y1="' + (y0 + 24) + '" x2="' + (x + 48) + '" y2="' + (y0 + 24) + '" stroke="' + COL.normal + '" stroke-width="2"/>';
+      s += '<line x1="' + x + '" y1="' + (y0 + 22) + '" x2="' + (x + 26) + '" y2="' + (y0 + 20) + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + (x + 48) + '" y1="' + (y0 + 20) + '" x2="' + (x + 74) + '" y2="' + (y0 + 22) + '" stroke="' + COL.ink + '"/>';
+      s += '<text x="' + (x + 37) + '" y="' + (y0 + 40) + '" text-anchor="middle" font-size="10" font-family="' + MONO + '" fill="' + COL.normal + '">C' + (i + 1) + '</text>';
+      s += '<line x1="' + (x + 74) + '" y1="' + (y0 - 22) + '" x2="' + (x + 74) + '" y2="' + (y0 + 22) + '" stroke="' + COL.ink + '"/>';
+    }
+    s += '<text x="370" y="' + (y0 + 6) + '" font-size="11" fill="' + COL.ink2 + '">…</text>';
+    s += '<text x="16" y="' + (y0 + 78) + '" font-size="11.5" fill="' + COL.ink2 + '">τi = RiCi 인 모드의 합. 응답 근사에는 유리하지만,</text>';
+    s += '<text x="16" y="' + (y0 + 96) + '" font-size="11.5" fill="' + COL.ink2 + '">각 RC는 물리적 층과 대응하지 않는다(내부 노드에 물리적 의미 없음).</text>';
+    s += '<text x="16" y="' + (y0 + 122) + '" font-size="11.5" font-family="' + MONO + '" fill="' + COL.normal + '">ZF(s) = Σ RF,i / (1 + s·τF,i)</text>';
+    // Cauer : 사다리
+    s += '<text x="406" y="20" font-size="13" font-weight="700" fill="' + COL.ink + '">Cauer · 직렬 R + 접지 C 사다리</text>';
+    s += '<text x="406" y="' + (y0 + 6) + '" font-size="11" fill="' + COL.ink2 + '">열원</text>';
+    var xb = 436;
+    s += '<line x1="' + xb + '" y1="' + y0 + '" x2="' + (xb + 14) + '" y2="' + y0 + '" stroke="' + COL.ink + '" stroke-width="1.4"/>';
+    for (i = 0; i < 3; i++) {
+      var x2 = xb + 14 + i * 96;
+      s += '<line x1="' + x2 + '" y1="' + y0 + '" x2="' + x2 + '" y2="' + (y0 + 26) + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + (x2 - 11) + '" y1="' + (y0 + 26) + '" x2="' + (x2 + 11) + '" y2="' + (y0 + 26) + '" stroke="' + COL.degraded + '" stroke-width="2"/>';
+      s += '<line x1="' + (x2 - 11) + '" y1="' + (y0 + 34) + '" x2="' + (x2 + 11) + '" y2="' + (y0 + 34) + '" stroke="' + COL.degraded + '" stroke-width="2"/>';
+      s += '<line x1="' + x2 + '" y1="' + (y0 + 34) + '" x2="' + x2 + '" y2="' + (y0 + 52) + '" stroke="' + COL.ink + '"/>';
+      s += '<text x="' + (x2 - 16) + '" y="' + (y0 + 34) + '" text-anchor="end" font-size="10" font-family="' + MONO + '" fill="' + COL.degraded + '">C' + (i + 1) + '</text>';
+      s += '<rect x="' + (x2 + 16) + '" y="' + (y0 - 8) + '" width="48" height="16" fill="#fff" stroke="' + COL.degraded + '" stroke-width="1.4"/>';
+      s += '<text x="' + (x2 + 40) + '" y="' + (y0 + 4) + '" text-anchor="middle" font-size="10" font-family="' + MONO + '" fill="' + COL.degraded + '">R' + (i + 1) + '</text>';
+      s += '<line x1="' + x2 + '" y1="' + y0 + '" x2="' + (x2 + 16) + '" y2="' + y0 + '" stroke="' + COL.ink + '"/>';
+      s += '<line x1="' + (x2 + 64) + '" y1="' + y0 + '" x2="' + (x2 + 96) + '" y2="' + y0 + '" stroke="' + COL.ink + '"/>';
+    }
+    s += '<line x1="' + (xb + 4) + '" y1="' + (y0 + 52) + '" x2="' + (xb + 224) + '" y2="' + (y0 + 52) + '" stroke="' + COL.ink + '" stroke-width="1.6"/>';
+    s += '<text x="' + (xb + 230) + '" y="' + (y0 + 56) + '" font-size="10.5" fill="' + COL.ink2 + '">T₀</text>';
+    s += '<text x="406" y="' + (y0 + 78) + '" font-size="11.5" fill="' + COL.ink2 + '">열원에서 주변까지의 순차적 유효 열경로를 그대로 표현한다.</text>';
+    s += '<text x="406" y="' + (y0 + 96) + '" font-size="11.5" fill="' + COL.ink2 + '">누적 R–C 를 이으면 곧 구조함수가 된다 → 물리적 해석에 유리.</text>';
+    s += '<text x="406" y="' + (y0 + 122) + '" font-size="11.5" font-family="' + MONO + '" fill="' + COL.degraded + '">Y = D/N = sC₁ + 1/(R₁ + 1/(sC₂ + …))</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  /** 그림 5 : 정상 vs 열화 비교 개념도 */
+  function fig5(layerName) {
+    var W = 780, H = 312;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="' + FONT + '" style="width:100%;height:auto">';
+    s += '<rect width="' + W + '" height="' + H + '" fill="#fff"/>';
+    var L = 70, R = 700, Tp = 40, B = 240;
+    s += '<rect x="' + L + '" y="' + Tp + '" width="' + (R - L) + '" height="' + (B - Tp) + '" fill="none" stroke="' + COL.axis + '"/>';
+    s += '<text x="' + L + '" y="' + (Tp - 14) + '" font-size="12.5" font-weight="700" fill="' + COL.ink + '">누적 구조함수 개념 : 열화 시 해당 층 구간이 오른쪽으로 늘어난다</text>';
+    s += '<text x="' + ((L + R) / 2) + '" y="' + (B + 24) + '" text-anchor="middle" font-size="11.5" fill="' + COL.ink2 + '">누적 열저항 RΣ [K/W] →</text>';
+    s += '<text x="' + (L - 22) + '" y="' + ((Tp + B) / 2) + '" text-anchor="middle" font-size="11.5" fill="' + COL.ink2 + '" transform="rotate(-90 ' + (L - 22) + ' ' + ((Tp + B) / 2) + ')">누적 열용량 CΣ [J/K] →</text>';
+    // 정상 곡선 (계단형)
+    var nP = 'M90,232 L150,190 L175,186 L280,120 L320,112 L470,70 L520,58';
+    var dP = 'M90,232 L150,190 L295,186 L400,120 L440,112 L590,70 L640,58';
+    s += '<path d="' + nP + '" fill="none" stroke="' + COL.normal + '" stroke-width="2.4"/>';
+    s += '<path d="' + dP + '" fill="none" stroke="' + COL.degraded + '" stroke-width="2.4" stroke-dasharray="7,4"/>';
+    s += '<circle cx="150" cy="190" r="4" fill="' + COL.target + '"/>';
+    s += '<text x="152" y="207" font-size="11" font-weight="700" fill="' + COL.target + '">분기 시작</text>';
+    // 열화 층 구간의 수평 확장
+    s += '<path d="M178,178 L292,178" stroke="' + COL.target + '" stroke-width="1.6"/>';
+    s += '<path d="M285,174 L293,178 L285,182 Z" fill="' + COL.target + '"/>';
+    s += '<path d="M178,174 L178,182 M293,174 L293,182" stroke="' + COL.target + '" stroke-width="1.2"/>';
+    s += '<text x="300" y="224" font-size="11.5" font-weight="700" fill="' + COL.target + '">' + esc(layerName) + ' 구간의 유효 열저항 증가</text>';
+    // 이후 층의 평행 이동 (두 곡선 끝점 사이를 수평으로 연결)
+    s += '<path d="M524,58 L634,58" stroke="' + COL.target + '" stroke-width="1.6" stroke-dasharray="4,3"/>';
+    s += '<path d="M628,54 L636,58 L628,62 Z" fill="' + COL.target + '"/>';
+    s += '<path d="M580,58 L580,150" stroke="' + COL.target + '" stroke-width="0.9" stroke-dasharray="2,3"/>';
+    s += '<text x="580" y="166" text-anchor="middle" font-size="11.5" fill="' + COL.target + '">이후 층 전체가</text>';
+    s += '<text x="580" y="182" text-anchor="middle" font-size="11.5" fill="' + COL.target + '">오른쪽으로 평행 이동</text>';
+    // 범례
+    s += '<line x1="90" y1="290" x2="126" y2="290" stroke="' + COL.normal + '" stroke-width="2.4"/>';
+    s += '<text x="132" y="294" font-size="11.5" fill="' + COL.ink + '">정상 패키지</text>';
+    s += '<line x1="252" y1="290" x2="288" y2="290" stroke="' + COL.degraded + '" stroke-width="2.4" stroke-dasharray="7,4"/>';
+    s += '<text x="294" y="294" font-size="11.5" fill="' + COL.ink + '">열화 패키지 (CΣ 는 거의 동일, RΣ 만 증가)</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  3. 표 생성
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  function table(id, headers, rows, rowClass) {
+    var t = document.getElementById(id); if (!t) return;
+    var h = '<thead><tr>' + headers.map(function (x) {
+      return '<th class="' + (x.num ? 'num' : '') + '">' + x.t + '</th>';
+    }).join('') + '</tr></thead><tbody>';
+    rows.forEach(function (r, ri) {
+      h += '<tr class="' + (rowClass ? (rowClass(ri, r) || '') : '') + '">' + r.map(function (c, ci) {
+        return '<td class="' + (headers[ci] && headers[ci].num ? 'num' : '') + '">' + c + '</td>';
+      }).join('') + '</tr>';
+    });
+    t.innerHTML = h + '</tbody>';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  4. 상태 및 파라미터
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  var STATE = { result: null, uploaded: { normal: null, degraded: null }, seed: T.defaultParams().seed };
+  var ID = ['P_W', 'T0_C', 'tMin_s', 'tMax_s', 'nPoints', 'noise_C', 'nCell', 'degradeIndex', 'degradeFactor',
+    'smoothWindow', 'nTau', 'lambdaExp', 'fosterOrder', 'divThreshold_KW', 'divRelative_pct', 'divConsecutive',
+    'indepNoise'];
+  function g(id) { return document.getElementById(id); }
+  function num(id) { return parseFloat(g(id).value); }
+
+  /** 화면 입력값 → 계산 파라미터 (입력 오류 보정 포함) */
+  function readParams() {
+    var p = T.defaultParams();
+    p.P_W = clamp(num('P_W'), 0.01, 1e4, 10);
+    p.T0_C = clamp(num('T0_C'), -273, 500, 25);
+    p.tMin_s = clamp(num('tMin_s'), 1e-12, 1e3, 1e-7);
+    p.tMax_s = clamp(num('tMax_s'), p.tMin_s * 10, 1e6, 10);
+    p.nPoints = Math.round(clamp(num('nPoints'), 50, 1200, 300));
+    p.noise_C = clamp(num('noise_C'), 0, 10, 0.002);
+    p.nCell = Math.round(clamp(num('nCell'), 5, 20, 10));
+    p.degradeIndex = Math.round(clamp(num('degradeIndex'), 0, 4, 1));
+    p.degradeFactor = clamp(num('degradeFactor'), 1, 4, 2.5);
+    p.smoothWindow = Math.round(clamp(num('smoothWindow'), 5, 31, 11)) | 1;
+    p.nTau = Math.round(clamp(num('nTau'), 40, 300, 120));
+    p.lambda = Math.pow(10, clamp(num('lambdaExp'), -6, -1, -3));
+    p.fosterOrder = Math.round(clamp(num('fosterOrder'), 4, 12, 8));
+    p.divThreshold_KW = clamp(num('divThreshold_KW'), 1e-4, 1, 0.01);
+    p.divRelative_pct = clamp(num('divRelative_pct'), 0, 100, 40);
+    p.divConsecutive = Math.round(clamp(num('divConsecutive'), 1, 20, 3));
+    p.seed = STATE.seed;
+    p.sameNoise = !g('indepNoise').checked;
+    p.showExact = g('showExact').checked;
+    return p;
+  }
+  function clamp(v, lo, hi, dflt) { if (!isFinite(v)) return dflt; return Math.min(hi, Math.max(lo, v)); }
+  /** 정상상태 온도상승 대비 잡음 비 */
+  function snrTxt(dT, sigma) {
+    if (!(sigma > 0)) return '잡음 없음';
+    return Math.round(dT / sigma).toLocaleString('en-US') + ' : 1';
+  }
+
+  /** 슬라이더 값 표시 갱신 */
+  function syncLabels() {
+    g('v_nPoints').textContent = g('nPoints').value;
+    g('v_nCell').textContent = g('nCell').value + ' (총 ' + (5 * (+g('nCell').value)) + '단)';
+    g('v_degradeFactor').textContent = (+g('degradeFactor').value).toFixed(2).replace(/0$/, '').replace(/\.$/, '') + ' ×';
+    g('v_smoothWindow').textContent = g('smoothWindow').value + ' pt';
+    g('v_nTau').textContent = g('nTau').value;
+    g('v_lambda').textContent = Math.pow(10, +g('lambdaExp').value).toExponential(1);
+    g('v_fosterOrder').textContent = g('fosterOrder').value;
+    g('v_divThreshold').textContent = (+g('divThreshold_KW').value).toFixed(3) + ' K/W';
+    g('v_divRelative').textContent = g('divRelative_pct').value + ' %';
+    g('v_divConsecutive').textContent = g('divConsecutive').value;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  5. 렌더링
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  function layerBands(bounds, targetIdx) {
+    return bounds.map(function (b, i) {
+      return { x0: b.Rstart_KW, x1: b.Rcum_KW, fill: LAYER_FILL[i], label: 'L' + (i + 1), strong: i === targetIdx };
+    });
+  }
+
+  function render(res) {
+    var p = res.params, N = res.normal, D = res.degraded;
+    var tgt = p.degradeIndex, tgtName = res.layersNormal[tgt].name;
+    // 체크박스는 재계산 없이 즉시 반영되므로 결과가 아닌 화면 상태에서 직접 읽는다
+    var showExact = g('showExact').checked;
+
+    /* ── 개념도 ── */
+    g('fig1').innerHTML = fig1(res.layersNormal, res.layersDegraded, p);
+    g('fig2').innerHTML = fig2(res.layersNormal, p.nCell, tgt);
+    g('fig2tag').textContent = '총 ' + (5 * p.nCell) + '단';
+    g('fig3').innerHTML = fig3();
+    g('fig5').innerHTML = fig5('Layer ' + (tgt + 1) + ' ' + tgtName);
+
+    /* ── Tab 1 표 ── */
+    table('tblLayers',
+      [{ t: '층' }, { t: '재료' }, { t: 'L [mm]', num: 1 }, { t: 'k [W/m·K]', num: 1 }, { t: 'c<sub>v</sub> [J/m³·K]', num: 1 },
+      { t: 'R 정상 [K/W]', num: 1 }, { t: 'C [J/K]', num: 1 }, { t: 'τ=RC [s]', num: 1 }, { t: 'R 열화 [K/W]', num: 1 }],
+      res.layersNormal.map(function (l, i) {
+        return ['Layer ' + (i + 1), l.name, (l.L_m * 1e3).toFixed(3), l.k0_WmK.toFixed(1), l.cv_Jm3K.toExponential(2),
+          l.R_KW.toFixed(5), l.C_JK.toFixed(4), l.tau_s.toExponential(3),
+          (i === tgt ? '<b>' + res.layersDegraded[i].R_KW.toFixed(5) + '</b>' : res.layersDegraded[i].R_KW.toFixed(5))];
+      }).concat([['<b>합계</b>', '—', '—', '—', '—', '<b>' + res.RthTheoryNormal_KW.toFixed(5) + '</b>',
+        '<b>' + res.layersNormal.reduce(function (a, l) { return a + l.C_JK; }, 0).toFixed(4) + '</b>', '—',
+        '<b>' + res.RthTheoryDegraded_KW.toFixed(5) + '</b>']]),
+      function (ri) { return ri === tgt ? 'hl' : ''; });
+
+    var dTn = N.Tj_C[N.Tj_C.length - 1] - p.T0_C, dTd = D.Tj_C[D.Tj_C.length - 1] - p.T0_C;
+    table('tblSummary1', [{ t: '항목' }, { t: '정상', num: 1 }, { t: '열화', num: 1 }, { t: '차이', num: 1 }], [
+      ['이론 총 열저항 ΣR [K/W]', res.RthTheoryNormal_KW.toFixed(5), res.RthTheoryDegraded_KW.toFixed(5), (res.RthTheoryDegraded_KW - res.RthTheoryNormal_KW).toFixed(5)],
+      ['측정 Zth(t<sub>max</sub>) [K/W]', N.Rth_KW.toFixed(5), D.Rth_KW.toFixed(5), (D.Rth_KW - N.Rth_KW).toFixed(5)],
+      ['최종 온도 T<sub>j</sub> [°C]', N.Tj_C[N.Tj_C.length - 1].toFixed(3), D.Tj_C[D.Tj_C.length - 1].toFixed(3), (dTd - dTn).toFixed(3)],
+      ['온도 상승 ΔT<sub>j</sub> [K]', dTn.toFixed(3), dTd.toFixed(3), (dTd - dTn).toFixed(3)],
+      ['측정 SNR (ΔT∞/σ)', snrTxt(dTn, p.noise_C), snrTxt(dTd, p.noise_C), '—'],
+      ['데이터 출처', N.isUploaded ? '업로드 CSV' : '내부 시뮬레이션', D.isUploaded ? '업로드 CSV' : '내부 시뮬레이션', '—']
+    ]);
+    // SNR 경고 : Zth 는 P 와 T0 를 나누어 없애므로 구조함수는 원래 P·T0 에 무관하다.
+    //   다만 잡음 σ 는 절대값(°C)이므로 P 가 낮으면 SNR 이 나빠져 역추정만 흐려진다.
+    var snr = (p.noise_C > 0) ? dTn / p.noise_C : Infinity;
+    g('warnSnr').innerHTML = (snr < 500)
+      ? ('측정 SNR 이 ' + Math.round(snr) + ' : 1 로 낮습니다. Zth(t) = [Tj(t) − T0] / P 이므로 ' +
+         '<b>정답 구조함수는 입력전력 P 와 주변온도 T0 에 무관</b>하지만, 온도 잡음 σ 는 절대값(°C)이라 ' +
+         'P 가 작으면 신호 대비 잡음이 커져 <b>역추정 구조함수만 흐려집니다</b>. ' +
+         '입력전력을 올리거나 잡음을 줄이십시오.')
+      : '';
+
+    /* ── Tab 1 그래프 ── */
+    drawChart('c1', {
+      title: '과도 온도 응답 Tj(t) · step heating', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: '접합부 온도 Tj [°C]',
+      xName: 't', xUnit: 's', yUnit: '°C', legendLeft: true,
+      series: [
+        { name: '정상 Tj', x: N.t_s, y: N.Tj_C, color: COL.normal, marker: 'circle' },
+        { name: '열화 Tj', x: D.t_s, y: D.Tj_C, color: COL.degraded, dash: '7,4', marker: 'triangle' }
+      ]
+    });
+    drawChart('c2', {
+      title: '열임피던스 Zth(t)', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: 'Zth [K/W]',
+      xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true,
+      series: [
+        { name: '정상 Zth', x: N.t_s, y: N.Zth_KW, color: COL.normal, marker: 'circle' },
+        { name: '열화 Zth', x: D.t_s, y: D.Zth_KW, color: COL.degraded, dash: '7,4', marker: 'triangle' }
+      ]
+    });
+    var dz = new Float64Array(Math.min(N.t_s.length, D.t_s.length));
+    for (var i = 0; i < dz.length; i++) dz[i] = D.Zth_KW[i] - N.Zth_KW[i];
+    drawChart('c3', {
+      title: '열임피던스 차이 ΔZth(t) = Zth,열화 − Zth,정상', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: 'ΔZth [K/W]',
+      xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true,
+      series: [{ name: 'ΔZth', x: N.t_s, y: dz, color: COL.target, marker: 'square' }]
+    });
+
+    /* ── Tab 2 ── */
+    var tN = Array.prototype.map.call(N.z, Math.exp), tD = Array.prototype.map.call(D.z, Math.exp);
+    var s4 = [
+      { name: '정상 dZth/dln t', x: tN, y: N.h_KW, color: COL.normal, marker: 'circle' },
+      { name: '열화 dZth/dln t', x: tD, y: D.h_KW, color: COL.degraded, dash: '7,4', marker: 'triangle' }
+    ];
+    if (g('showRaw').checked) {
+      s4.push({ name: '정상 (평활 전)', x: tN, y: N.hRaw_KW, color: '#9DB4C0', width: 1 });
+      s4.push({ name: '열화 (평활 전)', x: tD, y: D.hRaw_KW, color: '#E0A8A0', width: 1 });
+    }
+    drawChart('c4', {
+      title: '로그 시간 미분 dZth/d ln(t)', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: 'dZth/d ln t [K/W]',
+      xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true, series: s4
+    });
+    drawChart('c5', {
+      title: '시간상수 스펙트럼 (시함수) · Foster 열저항 성분 분포', xLog: true,
+      xLabel: '시간상수 τ [s] (로그축)', yLabel: '열저항 성분 R(τ) [K/W]', xName: 'τ', xUnit: 's', yUnit: 'K/W',
+      yZero: true,
+      series: [
+        { name: '정상 스펙트럼', x: N.tau_s, y: N.spectrum, color: COL.normal, type: 'bar', width: 2.6 },
+        { name: '열화 스펙트럼', x: D.tau_s, y: D.spectrum, color: COL.degraded, type: 'bar', width: 1.4, opacity: 0.85 }
+      ]
+    });
+    var bandFit = [];
+    if (N.fitStart > 0) bandFit.push({ x0: Math.exp(N.z[0]), x1: Math.exp(N.z[N.fitStart]), fill: '#EDF1F4', label: '잡음 하한 · 추정 제외' });
+    drawChart('c5b', {
+      title: '디컨볼루션 적합도 (측정 vs 스펙트럼 재합성)', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: 'dZth/d ln t [K/W]',
+      xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true, bands: bandFit,
+      series: [
+        { name: '정상 측정', x: tN, y: N.h_KW, color: COL.normal, width: 2.2 },
+        { name: '정상 재합성', x: tN, y: N.specFit, color: '#5FB0C9', dash: '5,3', marker: 'circle' },
+        { name: '열화 측정', x: tD, y: D.h_KW, color: COL.degraded, width: 2.2 },
+        { name: '열화 재합성', x: tD, y: D.specFit, color: '#E08B7E', dash: '5,3', marker: 'triangle' }
+      ]
+    });
+    function specSum(a) { var s = 0; for (var i2 = 0; i2 < a.length; i2++) s += a[i2]; return s; }
+    table('tblSpec', [{ t: '항목' }, { t: '정상', num: 1 }, { t: '열화', num: 1 }], [
+      ['스펙트럼 총합 ΣR(τ) [K/W]', specSum(N.spectrum).toFixed(5), specSum(D.spectrum).toFixed(5)],
+      ['디컨볼루션 잔차 RMSE [K/W]', N.specRmse.toExponential(3), D.specRmse.toExponential(3)],
+      ['추정 잡음 σ<sub>Zth</sub> [K/W]', N.sigmaZ_KW.toExponential(3), D.sigmaZ_KW.toExponential(3)],
+      ['유효 적합 시작 시각 [s]', Math.exp(N.z[N.fitStart]).toExponential(3), Math.exp(D.z[D.fitStart]).toExponential(3)],
+      ['시간상수 후보 수 / λ', p.nTau + ' / ' + p.lambda.toExponential(1), p.nTau + ' / ' + p.lambda.toExponential(1)],
+      ['평활 창 [points]', p.smoothWindow, p.smoothWindow]
+    ]);
+
+    /* ── Tab 3 ── */
+    drawChart('c6', {
+      title: '원래 Zth 와 Foster 재구성 ZF 비교 (차수 ' + p.fosterOrder + ')', xLog: true,
+      xLabel: '시간 t [s] (로그축)', yLabel: 'Zth [K/W]', xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true,
+      series: [
+        { name: '정상 Zth (측정)', x: N.t_s, y: N.Zth_KW, color: COL.normal, width: 2.4 },
+        { name: '정상 ZF (Foster)', x: N.t_s, y: N.Zfoster_KW, color: '#5FB0C9', dash: '6,3', marker: 'circle' },
+        { name: '열화 Zth (측정)', x: D.t_s, y: D.Zth_KW, color: COL.degraded, width: 2.4 },
+        { name: '열화 ZF (Foster)', x: D.t_s, y: D.Zfoster_KW, color: '#E08B7E', dash: '6,3', marker: 'triangle' }
+      ]
+    });
+    var rN = new Float64Array(N.t_s.length), rD = new Float64Array(D.t_s.length);
+    for (i = 0; i < rN.length; i++) rN[i] = N.Zfoster_KW[i] - N.Zth_KW[i];
+    for (i = 0; i < rD.length; i++) rD[i] = D.Zfoster_KW[i] - D.Zth_KW[i];
+    drawChart('c7', {
+      title: 'Foster 재구성 잔차 ZF − Zth', xLog: true, xLabel: '시간 t [s] (로그축)', yLabel: '잔차 [K/W]',
+      xName: 't', xUnit: 's', yUnit: 'K/W', legendLeft: true,
+      series: [
+        { name: '정상 잔차', x: N.t_s, y: rN, color: COL.normal, marker: 'circle' },
+        { name: '열화 잔차', x: D.t_s, y: rD, color: COL.degraded, dash: '7,4', marker: 'triangle' }
+      ]
+    });
+    g('fosterErrTag').textContent = 'RMSE 정상 ' + N.fosterRmse_KW.toExponential(2) + ' / 열화 ' + D.fosterRmse_KW.toExponential(2) +
+      ' K/W · 최대오차 ' + Math.max(N.fosterMaxErr_KW, D.fosterMaxErr_KW).toExponential(2) +
+      ' K/W · 정상상태 오차 ' + N.ssErr_pct.toFixed(2) + '% / ' + D.ssErr_pct.toFixed(2) + '%';
+
+    var fRows = [];
+    [['정상', N, COL.normal], ['열화', D, COL.degraded]].forEach(function (c) {
+      var tot = c[1].fosterRtot_KW;
+      c[1].foster.forEach(function (f, k) {
+        fRows.push(['<span style="color:' + c[2] + ';font-weight:700">' + c[0] + '</span>', k + 1, f.R_KW.toFixed(5),
+          f.tau_s.toExponential(4), f.C_JK.toExponential(4), (100 * f.R_KW / tot).toFixed(2)]);
+      });
+    });
+    table('tblFoster', [{ t: '구분' }, { t: 'Mode', num: 1 }, { t: 'R<sub>F</sub> [K/W]', num: 1 }, { t: 'τ<sub>F</sub> [s]', num: 1 },
+    { t: 'C<sub>F</sub> [J/K]', num: 1 }, { t: 'R 기여 [%]', num: 1 }], fRows);
+
+    var cRows = [];
+    [['정상', N, COL.normal], ['열화', D, COL.degraded]].forEach(function (c) {
+      c[1].cauer.stages.forEach(function (s) {
+        cRows.push(['<span style="color:' + c[2] + ';font-weight:700">' + c[0] + '</span>', s.stage,
+          s.R_KW.toExponential(4), s.C_JK.toExponential(4), s.Rcum_KW.toFixed(5), s.Ccum_JK.toExponential(4)]);
+      });
+    });
+    table('tblCauer', [{ t: '구분' }, { t: 'Stage', num: 1 }, { t: 'R<sub>C</sub> [K/W]', num: 1 }, { t: 'C<sub>C</sub> [J/K]', num: 1 },
+    { t: '누적 R<sub>Σ</sub> [K/W]', num: 1 }, { t: '누적 C<sub>Σ</sub> [J/K]', num: 1 }], cRows);
+    g('cauerEqTag').textContent = 'Foster–Cauer 등가성 RMSE : 정상 ' +
+      (N.cauerEqRmse_KW === null ? '—' : N.cauerEqRmse_KW.toExponential(2)) + ' / 열화 ' +
+      (D.cauerEqRmse_KW === null ? '—' : D.cauerEqRmse_KW.toExponential(2)) + ' K/W';
+    var warn = [N.cauer.warning, D.cauer.warning].filter(Boolean);
+    g('cauerWarn').textContent = warn.length ? warn[0] : '';
+
+    /* ── Tab 4 ── */
+    var bands = layerBands(res.boundsNormal, tgt);
+    var s8 = [];
+    if (showExact) {
+      s8.push({ name: '정상 정답 (50단 모델)', x: N.sfExact.R_KW, y: N.sfExact.C_JK, color: COL.normal, width: 2.4 });
+      s8.push({ name: '열화 정답 (50단 모델)', x: D.sfExact.R_KW, y: D.sfExact.C_JK, color: COL.degraded, width: 2.4 });
+    }
+    s8.push({ name: '정상 역추정 (Cauer)', x: N.sfEstimated.R_KW, y: N.sfEstimated.C_JK, color: COL.normal, dash: '6,4', marker: 'circle', markerCount: 30, width: 1.6 });
+    s8.push({ name: '열화 역추정 (Cauer)', x: D.sfEstimated.R_KW, y: D.sfEstimated.C_JK, color: COL.degraded, dash: '3,3', marker: 'triangle', markerCount: 30, width: 1.6 });
+    var ann8 = [];
+    var dv = res.divergenceEstimated.found ? res.divergenceEstimated : res.divergenceExact;
+    if (dv.found) ann8.push({ x: dv.Rnormal_at_KW, y: dv.C_at_KW, text: '분기점 · Layer ' + ((res.diagnosis.layerIndex || 0) + 1), dx: 40, dy: -26 });
+    drawChart('c8', {
+      title: '누적 구조함수 CΣ(RΣ) · 정답 vs 역추정', height: 460,
+      xLabel: '누적 열저항 RΣ [K/W]', yLabel: '누적 열용량 CΣ [J/K]' + (g('sfLogY').checked ? ' (로그축)' : ''),
+      yLog: g('sfLogY').checked, xName: 'RΣ', xUnit: 'K/W', yUnit: 'J/K',
+      xMin: 0, xMax: Math.max(res.RthTheoryDegraded_KW, D.sfEstimated.R_KW[D.sfEstimated.R_KW.length - 1]) * 1.05,
+      yMax: Math.max(res.layersNormal.reduce(function (a, l) { return a + l.C_JK; }, 0), 1.2) * 1.6,
+      bands: bands, annotations: ann8, series: s8, legendLeft: true, legendBottom: true
+    });
+    var s9 = [];
+    if (showExact) {
+      s9.push({ name: '정상 정답 K = Ci/Ri', x: N.dsfExact.R_KW, y: N.dsfExact.K_JK2W, color: COL.normal, width: 2.4 });
+      s9.push({ name: '열화 정답 K = Ci/Ri', x: D.dsfExact.R_KW, y: D.dsfExact.K_JK2W, color: COL.degraded, width: 2.4 });
+    }
+    s9.push({ name: '정상 역추정', x: N.dsfEstimated.R_KW, y: N.dsfEstimated.K_JK2W, color: COL.normal, dash: '6,4', marker: 'circle', width: 1.6 });
+    s9.push({ name: '열화 역추정', x: D.dsfEstimated.R_KW, y: D.dsfEstimated.K_JK2W, color: COL.degraded, dash: '3,3', marker: 'triangle', width: 1.6 });
+    var kN = res.layersNormal[tgt].C_JK / res.layersNormal[tgt].R_KW, kD = res.layersDegraded[tgt].C_JK / res.layersDegraded[tgt].R_KW;
+    drawChart('c9', {
+      title: '미분 구조함수 K(RΣ) = dCΣ/dRΣ', height: 460, yLog: true,
+      xLabel: '누적 열저항 RΣ [K/W]', yLabel: 'K = dCΣ/dRΣ [J·W/K²] (로그축)', xName: 'RΣ', xUnit: 'K/W', yUnit: 'J·W/K²',
+      xMin: 0, xMax: Math.max(res.RthTheoryDegraded_KW, D.sfEstimated.R_KW[D.sfEstimated.R_KW.length - 1]) * 1.05,
+      bands: bands, series: s9, legendLeft: true, bandLabelBottom: true,
+      annotations: (showExact && p.degradeFactor > 1.01) ? [{
+        x: res.boundsNormal[tgt].Rstart_KW + res.layersNormal[tgt].R_KW * 0.5, y: kN,
+        text: 'Layer ' + (tgt + 1) + ' plateau ' + fmt(kN, 3) + ' → ' + fmt(kD, 3), dx: 60, dy: -24
+      }] : []
+    });
+    drawChart('c10', {
+      title: '구조함수 수평 이동 ΔRΣ(CΣ) · 동일 누적 열용량 비교', xLog: true,
+      xLabel: '누적 열용량 CΣ [J/K] (로그축)', yLabel: 'ΔRΣ = RΣ,열화 − RΣ,정상 [K/W]', xName: 'CΣ', xUnit: 'J/K', yUnit: 'K/W',
+      legendLeft: true,
+      series: [
+        { name: '역추정 기준 ΔRΣ', x: res.divergenceEstimated.C_JK, y: res.divergenceEstimated.dR_KW, color: COL.target, marker: 'square' }
+      ].concat(showExact ? [{ name: '정답 기준 ΔRΣ', x: res.divergenceExact.C_JK, y: res.divergenceExact.dR_KW, color: COL.exact, dash: '5,3' }] : [])
+        .concat([{ name: '적용 임계값', x: res.divergenceEstimated.C_JK, y: res.divergenceEstimated.C_JK.map(function () { return res.divergenceEstimated.threshold_KW; }), color: '#B0BFC9', dash: '3,3' }]),
+      vlines: dv.found ? [{ x: dv.C_at_KW, label: '분기점', color: COL.target }] : []
+    });
+
+    renderDiagnosis(res);
+    renderValidation(res);
+
+    var el2 = document.getElementById('status');
+    el2.textContent = '계산 완료 · 셀 ' + (5 * p.nCell) + '단 · 측정점 ' + p.nPoints +
+      ' · Foster ' + p.fosterOrder + '차 · λ=' + p.lambda.toExponential(1);
+  }
+
+  /** PHM 진단 박스 및 자동 해석문 */
+  function renderDiagnosis(res) {
+    var p = res.params, dg = res.diagnosis, tgt = p.degradeIndex;
+    var dv = res.divergenceEstimated.found ? res.divergenceEstimated : res.divergenceExact;
+    var kv = function (k, v) { return '<div class="kv"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; };
+
+    g('dDet').innerHTML =
+      '<span class="big">ΔRth = ' + dg.dRth_KW.toFixed(4) + ' K/W</span>' +
+      kv('정상 총 열저항', res.normal.Rth_KW.toFixed(5) + ' K/W') +
+      kv('열화 총 열저항', res.degraded.Rth_KW.toFixed(5) + ' K/W') +
+      kv('증가율 ΔRth [%]', dg.dRth_pct.toFixed(2) + ' %') +
+      kv('감지 하한 (잡음 기준)', dg.detectFloor_KW.toFixed(4) + ' K/W') +
+      kv('이상 판정', dg.detected ? '<span style="color:#C0392B">이상 감지</span>'
+        : '<span style="color:#1E7A46">이상 없음 (정상 범위)</span>');
+    g('dDet').className = 'dbody';
+
+    var branch = dg.branchFound;
+    var locName = branch ? ('Layer ' + (dg.layerIndex + 1) + ' (' + dg.layerName + ')')
+      : (dg.detected ? '판정 불가 (유의한 분기 없음)' : '해당 없음 (정상)');
+    g('dLoc').innerHTML =
+      '<span class="big" style="font-size:16px;color:' + (branch ? '#C0392B' : '#1E7A46') + '">고장 위치 후보 : ' + locName + '</span>' +
+      kv('분기점 누적 열용량 CΣ', branch ? dv.C_at_KW.toExponential(3) + ' J/K' : '—') +
+      kv('분기점 정상 RΣ', branch ? dv.Rnormal_at_KW.toFixed(5) + ' K/W' : '—') +
+      kv('적용 임계값', dv.threshold_KW.toFixed(4) + ' K/W') +
+      kv('지속 분리량', dv.dRsettle_KW.toFixed(4) + ' K/W') +
+      kv('판정 근거', !branch ? '—' : (res.divergenceEstimated.found ? '역추정 구조함수' : '정답 구조함수(보조)')) +
+      kv('heat source 기준', branch ? (dg.layerIndex + 1) + '번째 층' : '—');
+
+    g('dSev').innerHTML =
+      kv('총 열저항 증가량', dg.dRth_KW.toFixed(4) + ' K/W') +
+      kv('총 열저항 증가율', dg.dRth_pct.toFixed(2) + ' %') +
+      kv('정상상태 온도상승 증가', dg.dTinf_C.toFixed(3) + ' °C') +
+      kv('최대 구조함수 수평 이동', dg.maxShift_KW.toFixed(4) + ' K/W') +
+      kv('입력 열화 배율 (설정)', p.degradeFactor.toFixed(2) + ' ×') +
+      kv('분석 추정 열화 배율', dg.estimatedFactor === null ? '—' : dg.estimatedFactor.toFixed(2) + ' ×');
+
+    var li = [];
+    if (!dg.detected) {
+      li.push('정상 패키지와 시험 패키지의 총 열저항 차이가 ' + dg.dRth_KW.toFixed(4) + ' K/W 로 감지 하한 ' +
+        dg.detectFloor_KW.toFixed(4) + ' K/W 보다 작습니다. 열화로 볼 만한 변화가 없습니다.');
+      if (p.degradeFactor <= 1.001) {
+        li.push('열화 배율이 1.0이므로 두 패키지의 물성이 완전히 동일합니다. 정답 구조함수는 완전히 겹치며, ' +
+          '역추정 구조함수에서 보이는 미세한 차이는 두 측정에 서로 다른 잡음이 섞여 생긴 것입니다. ' +
+          '이 차이의 크기가 곧 현재 측정·해석 조건에서의 분해능 한계입니다.');
+      }
+    } else {
+      li.push('정상 패키지 대비 총 열저항이 ' + dg.dRth_KW.toFixed(3) + ' K/W (' + dg.dRth_pct.toFixed(1) + ' %) 증가하였습니다.');
+    }
+    if (dg.branchFound) {
+      li.push('구조함수의 최초 유의한 분기는 Layer ' + (dg.layerIndex + 1) + '(' + dg.layerName + ') 구간에서 관찰됩니다.');
+      li.push('열저항 증가가 heat source로부터 ' + (dg.layerIndex + 1) + '번째 층에 집중되어 있어 ' + dg.layerName +
+        ' 계면의 유효 열전도 저하 또는 계면 결함이 고장 후보로 판단됩니다.');
+    } else if (dg.detected) {
+      li.push('총 열저항 증가는 감지되었으나 구조함수가 지속적으로 벌어지는 구간을 찾지 못해 위치는 판정하지 않았습니다. ' +
+        '열화량이 작아 역추정 구조함수의 계단 오차에 묻힌 상태이며, 분기 임계값을 낮추거나 잡음을 줄이면 판정할 수 있습니다.');
+    }
+    li.push('입력 전력 ' + p.P_W + ' W 기준으로 정상상태 온도 상승 차이는 ' + dg.dTinf_C.toFixed(2) + ' °C 입니다 (ΔT∞ = P × ΔRth).');
+    if (dg.branchFound && dg.layerIndex !== tgt) {
+      li.push('참고 : 실제 설정된 열화 층은 Layer ' + (tgt + 1) + '(' + res.layersNormal[tgt].name +
+        ')입니다. 역추정 차수·정규화·잡음 조건에 따라 분기 위치 판정이 인접 층으로 이동할 수 있습니다.');
+    }
+    li.push('본 결과는 고장 위치 <b>후보</b>를 의미하며, 실제 패키지에서는 기준 시편, 재료 물성 및 구조 정보를 함께 검토해야 합니다.');
+    g('interpret').innerHTML = '<b>결과 해석</b><ul style="margin:8px 0 0;padding-left:20px">' +
+      li.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+  }
+
+  function renderValidation(res) {
+    var rows = res.validation.map(function (v) {
+      return [v.item, v.ref, v.got, v.err, '<span class="pill ' + (v.pass ? 'pass' : 'check') + '">' + (v.pass ? '통과' : '확인 필요') + '</span>' +
+        (v.note ? ' <span style="color:#3B5261">' + v.note + '</span>' : '')];
+    });
+    table('tblValid', [{ t: '검증 항목' }, { t: '기준값', num: 1 }, { t: '계산값', num: 1 }, { t: '오차', num: 1 }, { t: '판정' }], rows);
+    var np = res.validation.filter(function (v) { return !v.pass; }).length;
+    g('validTag').textContent = np === 0 ? '전 항목 통과 (12/12)' : ('확인 필요 ' + np + '건 / 12');
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  6. 내보내기
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  function download(name, text, mime) {
+    var blob = new Blob(['\ufeff' + text], { type: (mime || 'text/csv') + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  }
+
+  function caseCsv(c, p) {
+    var dT = [], zz = [];
+    for (var i = 0; i < c.t_s.length; i++) { dT.push(c.Tj_C[i] - p.T0_C); zz.push(c.Zth_KW[i]); }
+    return T.exportCSV(['time_s', 'temperature_C', 'delta_temperature_C', 'Zth_K_per_W'],
+      [c.t_s, c.Tj_C, dT, zz]);
+  }
+
+  function analysisCsv(res) {
+    var p = res.params, L = [];
+    L.push('# 반도체 패키지 과도 열응답 기반 구조함수 분석 결과');
+    L.push('# 생성시각,' + new Date().toISOString());
+    L.push('');
+    L.push('# [설정]');
+    L.push('항목,값');
+    [['입력전력_W', p.P_W], ['초기온도_C', p.T0_C], ['최소시간_s', p.tMin_s], ['최대시간_s', p.tMax_s],
+    ['측정점수', p.nPoints], ['온도잡음_C', p.noise_C], ['층별셀수', p.nCell], ['열화대상층', p.degradeIndex + 1],
+    ['열화배율', p.degradeFactor], ['평활창', p.smoothWindow], ['시간상수grid', p.nTau], ['정규화강도_lambda', p.lambda],
+    ['Foster차수', p.fosterOrder], ['분기임계값_절대_KW', p.divThreshold_KW], ['분기임계값_상대_pct', p.divRelative_pct]]
+      .forEach(function (r) { L.push(r[0] + ',' + r[1]); });
+    L.push('');
+    L.push('# [층별 물성 및 R,C]');
+    L.push('layer,name,L_mm,k_W_mK,cv_J_m3K,R_normal_K_W,R_degraded_K_W,C_J_K');
+    res.layersNormal.forEach(function (l, i) {
+      L.push([i + 1, l.name, l.L_m * 1e3, l.k0_WmK, l.cv_Jm3K, l.R_KW, res.layersDegraded[i].R_KW, l.C_JK].join(','));
+    });
+    L.push('');
+    ['normal', 'degraded'].forEach(function (key) {
+      var c = res[key];
+      L.push('# [Foster 파라미터 - ' + key + ']');
+      L.push('mode,R_K_W,tau_s,C_J_K,R_contribution_pct');
+      c.foster.forEach(function (f, i) { L.push([i + 1, f.R_KW, f.tau_s, f.C_JK, 100 * f.R_KW / c.fosterRtot_KW].join(',')); });
+      L.push('');
+      L.push('# [Cauer 파라미터 - ' + key + ']');
+      L.push('stage,R_K_W,C_J_K,Rcum_K_W,Ccum_J_K');
+      c.cauer.stages.forEach(function (s) { L.push([s.stage, s.R_KW, s.C_JK, s.Rcum_KW, s.Ccum_JK].join(',')); });
+      L.push('');
+      L.push('# [정답 누적 구조함수 - ' + key + ']');
+      L.push('Rcum_K_W,Ccum_J_K');
+      for (var i = 0; i < c.sfExact.R_KW.length; i++) L.push(c.sfExact.R_KW[i] + ',' + c.sfExact.C_JK[i]);
+      L.push('');
+    });
+    L.push('# [구조함수 수평이동 - 역추정 기준]');
+    L.push('Ccum_J_K,R_normal_K_W,R_degraded_K_W,dR_K_W');
+    var d = res.divergenceEstimated;
+    for (var i = 0; i < d.C_JK.length; i++) L.push([d.C_JK[i], d.Rnormal_KW[i], d.Rdegraded_KW[i], d.dR_KW[i]].join(','));
+    L.push('');
+    L.push('# [PHM 진단]');
+    var dg = res.diagnosis;
+    L.push('항목,값');
+    L.push('dRth_K_W,' + dg.dRth_KW);
+    L.push('dRth_pct,' + dg.dRth_pct);
+    L.push('dT_inf_C,' + dg.dTinf_C);
+    L.push('고장위치후보_layer,' + (dg.layerIndex === null ? '미검출' : dg.layerIndex + 1));
+    L.push('고장위치후보_name,' + (dg.layerName || '-'));
+    L.push('최대수평이동_K_W,' + dg.maxShift_KW);
+    L.push('입력열화배율,' + p.degradeFactor);
+    L.push('추정열화배율,' + (dg.estimatedFactor === null ? '-' : dg.estimatedFactor));
+    L.push('');
+    L.push('# [검증]');
+    L.push('항목,기준값,계산값,오차,판정');
+    res.validation.forEach(function (v) {
+      L.push('"' + v.item + '","' + v.ref + '","' + v.got + '","' + v.err + '",' + (v.pass ? '통과' : '확인필요'));
+    });
+    return L.join('\n');
+  }
+
+  /** SVG 차트를 PNG 로 저장 */
+  function savePng(hostId, filename) {
+    var host = document.getElementById(hostId);
+    var svg = host && host.querySelector('svg');
+    if (!svg) return;
+    var clone = svg.cloneNode(true);
+    clone.setAttribute('xmlns', SVGNS);
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    var vb = (svg.getAttribute('viewBox') || '0 0 780 420').split(/\s+/);
+    var w = +vb[2], h = +vb[3];
+    clone.setAttribute('width', w); clone.setAttribute('height', h);
+    var str = new XMLSerializer().serializeToString(clone);
+    var img = new Image();
+    img.onload = function () {
+      var cv = document.createElement('canvas'), k = 2;
+      cv.width = w * k; cv.height = h * k;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(function (b) {
+        var url = URL.createObjectURL(b), a = document.createElement('a');
+        a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+        setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+      }, 'image/png');
+    };
+    img.onerror = function () { alert('PNG 변환에 실패했습니다. 브라우저를 최신 Chrome 또는 Edge로 실행해 주십시오.'); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   *  7. 이벤트 및 실행 제어
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  var timer = null, running = false;
+  function scheduleRun(delay) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(runNow, delay === undefined ? 220 : delay);
+  }
+
+  function runNow() {
+    if (running) { scheduleRun(120); return; }
+    running = true;
+    var st = g('status'); st.textContent = '계산 중…';
+    syncLabels();
+    setTimeout(function () {
+      try {
+        var p = readParams();
+        var t0 = performance.now();
+        var res = T.runAnalysis(p, STATE.uploaded);
+        STATE.result = res;
+        render(res);
+        g('status').textContent = g('status').textContent + ' · ' + (performance.now() - t0).toFixed(0) + ' ms';
+      } catch (e) {
+        g('status').textContent = '오류 발생';
+        g('uploadErr').textContent = '계산 오류: ' + (e && e.message ? e.message : e);
+        if (window.console) console.error(e);
+      }
+      running = false;
+    }, 10);
+  }
+
+  /** 예제 시나리오 목록 채우기 */
+  function initPresets() {
+    var sel = g('preset'), P = window.TSF.PRESETS;
+    sel.innerHTML = P.map(function (x, i) {
+      return '<option value="' + x.id + '"' + (x.id === 'std' ? ' selected' : '') + '>' + x.name + '</option>';
+    }).join('');
+    g('presetDesc').textContent = P[1].desc;
+  }
+
+  /** 선택한 시나리오의 값으로 제어 패널을 채우고 다시 계산한다 */
+  function applyPreset(id) {
+    var P = window.TSF.PRESETS, pr = null;
+    for (var i = 0; i < P.length; i++) if (P[i].id === id) pr = P[i];
+    if (!pr) return;
+    g('presetDesc').textContent = pr.desc;
+    applying = true;
+    var st = pr.set;
+    for (var k in st) {
+      if (!Object.prototype.hasOwnProperty.call(st, k)) continue;
+      var el = g(k); if (!el) continue;
+      if (el.type === 'checkbox') el.checked = !!st[k]; else el.value = st[k];
+    }
+    applying = false;
+    syncLabels();
+    runNow();
+  }
+
+  /** 사용자가 값을 직접 바꾸면 시나리오 선택을 해제 표시한다 */
+  var applying = false;
+  function markCustom() {
+    if (applying) return;
+    var sel = g('preset'); if (!sel || sel.value === 'custom') return;
+    if (!sel.querySelector('option[value=custom]')) {
+      var o = document.createElement('option');
+      o.value = 'custom'; o.textContent = '· 사용자 설정';
+      sel.appendChild(o);
+    }
+    sel.value = 'custom';
+    g('presetDesc').textContent = '제어 패널에서 직접 조정한 상태입니다. 목록에서 시나리오를 고르면 되돌아갑니다.';
+  }
+
+  function bind() {
+    g('preset').addEventListener('change', function () { if (this.value !== 'custom') applyPreset(this.value); });
+    ID.forEach(function (id) {
+      var e = g(id); if (!e) return;
+      e.addEventListener('input', function () { markCustom(); syncLabels(); scheduleRun(); });
+      e.addEventListener('change', function () { syncLabels(); scheduleRun(60); });
+    });
+    ['showExact', 'showRaw', 'sfLogY'].forEach(function (id) {
+      g(id).addEventListener('change', function () { if (STATE.result) render(STATE.result); });
+    });
+    g('btnRun').addEventListener('click', function () { runNow(); });
+    g('btnDefault').addEventListener('click', function () { resetAll(); });
+    g('btnReset').addEventListener('click', function () { resetAll(); });
+    g('btnRenoise').addEventListener('click', function () {
+      STATE.seed = (STATE.seed * 1103515245 + 12345) >>> 8 || 12345; runNow();
+    });
+    g('btnClearUpload').addEventListener('click', function () {
+      STATE.uploaded = { normal: null, degraded: null };
+      g('fileNormal').value = ''; g('fileDegraded').value = ''; g('uploadErr').textContent = '';
+      runNow();
+    });
+    g('fileNormal').addEventListener('change', function (e) { loadCsv(e.target.files[0], 'normal'); });
+    g('fileDegraded').addEventListener('change', function (e) { loadCsv(e.target.files[0], 'degraded'); });
+
+    g('btnCsvN').addEventListener('click', function () {
+      if (!STATE.result) return;
+      download('example_normal_thermal_transient.csv', caseCsv(STATE.result.normal, STATE.result.params));
+    });
+    g('btnCsvD').addEventListener('click', function () {
+      if (!STATE.result) return;
+      download('example_layer' + (STATE.result.params.degradeIndex + 1) + '_degraded_thermal_transient.csv',
+        caseCsv(STATE.result.degraded, STATE.result.params));
+    });
+    g('btnCsvA').addEventListener('click', function () {
+      if (!STATE.result) return;
+      download('structure_function_analysis_result.csv', analysisCsv(STATE.result));
+    });
+    g('btnPng').addEventListener('click', function () {
+      var page = document.querySelector('.tabpage.active');
+      var boxes = page.querySelectorAll('.chartbox');
+      if (!boxes.length) { alert('현재 탭에는 저장할 그래프가 없습니다.'); return; }
+      Array.prototype.forEach.call(boxes, function (b, i) {
+        setTimeout(function () { savePng(b.id, 'chart_' + b.id + '.png'); }, i * 350);
+      });
+    });
+    document.querySelectorAll('.pngbtn').forEach(function (b) {
+      b.addEventListener('click', function () { savePng(b.getAttribute('data-png'), 'chart_' + b.getAttribute('data-png') + '.png'); });
+    });
+    document.querySelectorAll('.tab').forEach(function (t2) {
+      t2.addEventListener('click', function () {
+        document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-selected', 'false'); });
+        t2.setAttribute('aria-selected', 'true');
+        document.querySelectorAll('.tabpage').forEach(function (x) { x.classList.remove('active'); });
+        g('page' + t2.getAttribute('data-tab')).classList.add('active');
+      });
+    });
+    window.addEventListener('resize', function () { /* SVG viewBox 로 자동 반응 */ });
+  }
+
+  var DEFAULT_UI = {
+    P_W: 10, T0_C: 25, tMin_s: 1e-7, tMax_s: 10, nPoints: 300, noise_C: 0.002, nCell: 10,
+    degradeIndex: 1, degradeFactor: 2.5, smoothWindow: 11, nTau: 120, lambdaExp: -3,
+    fosterOrder: 8, divThreshold_KW: 0.01, divRelative_pct: 40, divConsecutive: 3
+  };
+  function resetAll() {
+    for (var k in DEFAULT_UI) g(k).value = DEFAULT_UI[k];
+    g('showExact').checked = false; g('showRaw').checked = false; g('sfLogY').checked = true;
+    g('indepNoise').checked = false;
+    if (g('preset')) { g('preset').value = 'std'; g('presetDesc').textContent = window.TSF.PRESETS[1].desc; }
+    STATE.seed = T.defaultParams().seed;
+    STATE.uploaded = { normal: null, degraded: null };
+    g('fileNormal').value = ''; g('fileDegraded').value = ''; g('uploadErr').textContent = '';
+    syncLabels(); runNow();
+  }
+
+  /** CSV 업로드 처리 */
+  function loadCsv(file, which) {
+    if (!file) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var p = readParams();
+        var d = T.parseCsvTimeTemp(fr.result, p.T0_C);
+        STATE.uploaded[which] = { t_s: d.t_s, T_C: d.T_C };
+        g('uploadErr').textContent = '';
+        g('uploadErr').style.color = '#1E7A46';
+        g('uploadErr').textContent = (which === 'normal' ? '정상' : '열화') + ' 데이터 ' + d.t_s.length + '점을 불러왔습니다' +
+          (d.isDelta ? ' (온도상승 형식 → T0를 더해 절대온도로 변환).' : '.');
+        runNow();
+      } catch (e) {
+        g('uploadErr').style.color = '#C0392B';
+        g('uploadErr').textContent = 'CSV 오류 (' + (which === 'normal' ? '정상' : '열화') + ' 파일): ' + e.message;
+      }
+    };
+    fr.onerror = function () {
+      g('uploadErr').style.color = '#C0392B';
+      g('uploadErr').textContent = '파일을 읽을 수 없습니다. 파일 권한 또는 형식을 확인하십시오.';
+    };
+    fr.readAsText(file, 'utf-8');
+  }
+
+  /* ── 시작 ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    initPresets();
+    bind();
+    syncLabels();
+    runNow();
+  });
+})();
+
+</script>
+</body>
+</html>
